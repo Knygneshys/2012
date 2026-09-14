@@ -1,17 +1,17 @@
 package com.example;
 
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.SwingUtilities;
 
 public class App {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("Swing Starter");
+            JFrame frame = new JFrame("Bomberman Map Demo");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(400, 200);
+            frame.add(new MapPanel(DemoMapFactory.createDefaultMap()));
+            frame.pack();
             frame.setLocationRelativeTo(null);
-            frame.add(new JLabel("Hello, javax.swing!", JLabel.CENTER));
+            frame.setResizable(false);
             frame.setVisible(true);
         });
     }
