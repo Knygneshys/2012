@@ -6,16 +6,18 @@ import java.awt.Graphics;
 import javax.swing.JPanel;
 
 public class MapPanel extends JPanel {
-    private static final int TILE_SIZE = 40;
+    public static final int TILE_SIZE = 40;
     private static final Color GRID_COLOR = new Color(30, 30, 30);
     private static final Color FLOOR_COLOR = new Color(205, 190, 160);
     private static final Color HARD_WALL_COLOR = new Color(70, 90, 120);
     private static final Color SOFT_BLOCK_COLOR = new Color(160, 110, 70);
 
     private final TileType[][] map;
+    private final Player player;
 
-    public MapPanel(TileType[][] map) {
+    public MapPanel(TileType[][] map, Player player) {
         this.map = map;
+        this.player = player;
         setPreferredSize(new Dimension(
                 DemoMapFactory.MAP_WIDTH * TILE_SIZE,
                 DemoMapFactory.MAP_HEIGHT * TILE_SIZE
@@ -33,6 +35,11 @@ public class MapPanel extends JPanel {
                 g.drawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
             }
         }
+        int playerX = player.getPosition().x();
+        int playerY = player.getPosition().y();
+
+        g.setColor(player.color);
+        g.fillOval(playerX, playerY, TILE_SIZE, TILE_SIZE);
     }
 
     private Color tileColor(TileType tile) {
