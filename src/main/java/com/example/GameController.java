@@ -19,6 +19,7 @@ public class GameController {
                     case KeyEvent.VK_S -> player.move(0, player.moveSpeed, map);
                     case KeyEvent.VK_A -> player.move(-player.moveSpeed, 0, map);
                     case KeyEvent.VK_D -> player.move(player.moveSpeed, 0, map);
+                    case KeyEvent.VK_SPACE -> mapPanel.placeBomb(player);
                 }
                 mapPanel.repaint();
             }

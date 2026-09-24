@@ -4,12 +4,14 @@ import java.awt.Color;
 
 public class Player extends Character {
     public String name;
+    public boolean alive = true;
 
     public Player(int x,int y,int moveSpeed,String name, Color color, int width, int height) {
         super(x, y, moveSpeed, color, width, height);
         this.name = name;
     }
     public void move(int dx, int dy, TileType[][] map) {
+        if (!alive) return;
         if(position.x() + dx < 0 || position.x() + dx >= map[0].length * MapPanel.TILE_SIZE ||
            position.y() + dy < 0 || position.y() + dy >= map.length * MapPanel.TILE_SIZE) {
             return; 
