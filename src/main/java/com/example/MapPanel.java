@@ -3,6 +3,8 @@ package com.example;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Font;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -16,7 +18,7 @@ public class MapPanel extends JPanel {
     private static final Color HARD_WALL_COLOR = new Color(70, 90, 120);
     private static final Color SOFT_BLOCK_COLOR = new Color(160, 110, 70);
 
-    private final TileType[][] map;
+    private TileType[][] map;
     private final Player player;
 
     private final List<Bomb> bombs = new ArrayList<>();
@@ -41,7 +43,24 @@ public class MapPanel extends JPanel {
         timer.start();
     }
 
+    public TileType[][] getMap() {
+        return map;
+    }
+
+    public void resetGame() {
+        // regenerate map
+        this.map = DemoMapFactory.createDefaultMap();
+        bombs.clear();
+        explosions.clear();
+        // reset player to spawn
+        player.position = new GameObject.Position(1 * TILE_SIZE, 1 * TILE_SIZE);
+        player.alive = true;
+        player.color = player.initialColor;
+        player.moveSpeed = player.initialMoveSpeed;
+    }
+
     public void placeBomb(Player p) {
+        if (!p.alive) return; // don't allow placing when dead
         int px = p.getPosition().x();
         int py = p.getPosition().y();
         int tileX = (px + TILE_SIZE/2) / TILE_SIZE;
@@ -154,6 +173,22 @@ public class MapPanel extends JPanel {
 
         g.setColor(player.color);
         g.fillOval(playerX, playerY, TILE_SIZE, TILE_SIZE);
+
+        // if dead, draw retry overlay
+        if (!player.alive) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setColor(new Color(0, 0, 0, 160));
+            g2.fillRect(0, 0, getWidth(), getHeight());
+            g2.setColor(Color.WHITE);
+            g2.setFont(new Font("SansSerif", Font.BOLD, 28));
+            String msg = "You Died";
+            String hint = "Press R to Retry";
+            int mw = g2.getFontMetrics().stringWidth(msg);
+            int hw = g2.getFontMetrics().stringWidth(hint);
+            g2.drawString(msg, (getWidth() - mw) / 2, getHeight() / 2 - 10);
+            g2.drawString(hint, (getWidth() - hw) / 2, getHeight() / 2 + 30);
+            g2.dispose();
+        }
     }
 
     private Color tileColor(TileType tile) {

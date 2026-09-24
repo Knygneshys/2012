@@ -5,10 +5,14 @@ import java.awt.Color;
 public class Player extends Character {
     public String name;
     public boolean alive = true;
+    public final Color initialColor;
+    public final int initialMoveSpeed;
 
     public Player(int x,int y,int moveSpeed,String name, Color color, int width, int height) {
         super(x, y, moveSpeed, color, width, height);
         this.name = name;
+        this.initialColor = color;
+        this.initialMoveSpeed = moveSpeed;
     }
     public void move(int dx, int dy, TileType[][] map) {
         if (!alive) return;
