@@ -1,5 +1,7 @@
 package com.example;
 
+import java.util.Random;
+
 public final class DemoMapFactory {
     public static final int MAP_WIDTH = 13;
     public static final int MAP_HEIGHT = 11;
@@ -26,9 +28,12 @@ public final class DemoMapFactory {
             }
         }
 
+        // Randomize soft blocks (breakables) — avoid hard walls and border
+        Random rnd = new Random();
+        double softBlockProbability = 0.35; // ~35% of remaining floor tiles
         for (int y = 1; y < MAP_HEIGHT - 1; y++) {
             for (int x = 1; x < MAP_WIDTH - 1; x++) {
-                if (map[y][x] == TileType.FLOOR && (x + y) % 3 == 0) {
+                if (map[y][x] == TileType.FLOOR && rnd.nextDouble() < softBlockProbability) {
                     map[y][x] = TileType.SOFT_BLOCK;
                 }
             }
