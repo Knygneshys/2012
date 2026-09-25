@@ -1,5 +1,7 @@
 package com.example;
 
+import com.example.client.NetworkClient;
+
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 import java.awt.Color;
@@ -11,7 +13,8 @@ public class App {
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             TileType[][] map = DemoMapFactory.createDefaultMap();
             MapPanel mapPanel = new MapPanel(map, player);
-            GameController controller = new GameController(player, mapPanel,map);
+            NetworkClient networkClient = new NetworkClient("localhost", 5555);
+            GameController controller = new GameController(player, mapPanel, map, networkClient);
             frame.add(mapPanel);
             frame.pack();
             frame.setLocationRelativeTo(null);

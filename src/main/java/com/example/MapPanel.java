@@ -6,8 +6,11 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Font;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import javax.swing.JPanel;
 import javax.swing.Timer;
 
@@ -19,10 +22,14 @@ public class MapPanel extends JPanel {
     private static final Color SOFT_BLOCK_COLOR = new Color(160, 110, 70);
 
     private TileType[][] map;
-    private final Player player;
+    private final Player player; // Local player
+
+    // Multiplayer support
+    public final Map<Integer, RemotePlayer> remotePlayers = Collections.synchronizedMap(new HashMap<>());
 
     private final List<Bomb> bombs = new ArrayList<>();
     private final List<Explosion> explosions = new ArrayList<>();
+    private List<int[]> serverBombs = new ArrayList<>(); // Bombs from server
     private final Timer timer;
 
     private static final int TICK_MS = 100;
@@ -47,11 +54,39 @@ public class MapPanel extends JPanel {
         return map;
     }
 
+    public void addRemotePlayer(int playerId, String name, Color color) {
+        RemotePlayer rp = new RemotePlayer(playerId, name, color);
+        remotePlayers.put(playerId, rp);
+    }
+
+    public void updateRemotePlayer(int playerId, int x, int y, boolean alive) {
+        RemotePlayer rp = remotePlayers.get(playerId);
+        if (rp != null) {
+            rp.x = x;
+            rp.y = y;
+            rp.alive = alive;
+        }
+    }
+
+    public void updateGameState(TileType[][] newMap, List<int[][]> explosionTiles, List<int[]> bombTiles) {
+        this.map = newMap;
+        this.explosions.clear();
+        this.serverBombs = bombTiles;
+        for (int[][] tiles : explosionTiles) {
+            Explosion ex = new Explosion();
+            for (int[] tile : tiles) {
+                ex.addTile(tile[0], tile[1]);
+            }
+            this.explosions.add(ex);
+        }
+    }
+
     public void resetGame() {
         // regenerate map
         this.map = DemoMapFactory.createDefaultMap();
         bombs.clear();
         explosions.clear();
+        remotePlayers.clear();
         // reset player to spawn
         player.position = new GameObject.Position(1 * TILE_SIZE, 1 * TILE_SIZE);
         player.alive = true;
@@ -158,6 +193,15 @@ public class MapPanel extends JPanel {
             g.fillOval(bx + pad, by + pad, TILE_SIZE - pad*2, TILE_SIZE - pad*2);
         }
 
+        // draw bombs from server
+        for (int[] bomb : serverBombs) {
+            int bx = bomb[0] * TILE_SIZE;
+            int by = bomb[1] * TILE_SIZE;
+            g.setColor(Color.BLACK);
+            int pad = TILE_SIZE/6;
+            g.fillOval(bx + pad, by + pad, TILE_SIZE - pad*2, TILE_SIZE - pad*2);
+        }
+
         // draw explosions
         for (Explosion ex : explosions) {
             g.setColor(new Color(255, 140, 0));
@@ -168,26 +212,46 @@ public class MapPanel extends JPanel {
             }
         }
 
+        // Draw local player
         int playerX = player.getPosition().x();
         int playerY = player.getPosition().y();
-
         g.setColor(player.color);
         g.fillOval(playerX, playerY, TILE_SIZE, TILE_SIZE);
 
+        // Draw player name label
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("SansSerif", Font.BOLD, 10));
+        g2.drawString(player.name, playerX, playerY - 2);
+        g2.dispose();
+
+        // Draw remote players
+        for (RemotePlayer rp : remotePlayers.values()) {
+            g.setColor(rp.color);
+            g.fillOval(rp.x, rp.y, TILE_SIZE, TILE_SIZE);
+
+            // Draw player name label
+            g2 = (Graphics2D) g.create();
+            g2.setColor(Color.WHITE);
+            g2.setFont(new Font("SansSerif", Font.BOLD, 10));
+            g2.drawString(rp.name, rp.x, rp.y - 2);
+            g2.dispose();
+        }
+
         // if dead, draw retry overlay
         if (!player.alive) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setColor(new Color(0, 0, 0, 160));
-            g2.fillRect(0, 0, getWidth(), getHeight());
-            g2.setColor(Color.WHITE);
-            g2.setFont(new Font("SansSerif", Font.BOLD, 28));
+            Graphics2D g2d = (Graphics2D) g.create();
+            g2d.setColor(new Color(0, 0, 0, 160));
+            g2d.fillRect(0, 0, getWidth(), getHeight());
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 28));
             String msg = "You Died";
             String hint = "Press R to Retry";
-            int mw = g2.getFontMetrics().stringWidth(msg);
-            int hw = g2.getFontMetrics().stringWidth(hint);
-            g2.drawString(msg, (getWidth() - mw) / 2, getHeight() / 2 - 10);
-            g2.drawString(hint, (getWidth() - hw) / 2, getHeight() / 2 + 30);
-            g2.dispose();
+            int mw = g2d.getFontMetrics().stringWidth(msg);
+            int hw = g2d.getFontMetrics().stringWidth(hint);
+            g2d.drawString(msg, (getWidth() - mw) / 2, getHeight() / 2 - 10);
+            g2d.drawString(hint, (getWidth() - hw) / 2, getHeight() / 2 + 30);
+            g2d.dispose();
         }
     }
 
@@ -198,4 +262,24 @@ public class MapPanel extends JPanel {
             case SOFT_BLOCK -> SOFT_BLOCK_COLOR;
         };
     }
+
+    /**
+     * Represents a remote player on the network.
+     */
+    public static class RemotePlayer {
+        public int id;
+        public String name;
+        public int x;
+        public int y;
+        public boolean alive;
+        public Color color;
+
+        public RemotePlayer(int id, String name, Color color) {
+            this.id = id;
+            this.name = name;
+            this.color = color;
+            this.alive = true;
+        }
+    }
 }
+
