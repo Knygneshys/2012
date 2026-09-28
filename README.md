@@ -1,65 +1,90 @@
 # 2012 Bomberman - Multiplayer Edition
 
-A Java-based multiplayer Bomberman game with a client-server architecture supporting 2-4 players.
+A Java-based multiplayer Bomberman game with a fully separated client-server architecture supporting 2-4 players.
+
+```
+mano-projektas/
+├── client/          (Swing client code)
+└── server/          (Spring Boot server code)
+```
+
+The client and server are completely decoupled: they do **not** share classes or classpath dependencies and communicate exclusively over the network via TCP sockets using JSON messages (plus Spring REST endpoints).
 
 ## Features
 
 - **Multiplayer Support**: Play with 2-4 players in real-time
-- **Client-Server Architecture**: Dedicated server that manages game state, clients connect to play
-- **Network Synchronization**: Real-time game state updates to all connected players
-- **Player Positions**: See all players' positions in real-time
-- **Bombs & Explosions**: Place bombs that explode and destroy soft blocks
-- **Collision Detection**: Walk-through walls and bomb blast mechanics
+- **Separated Architecture**: Dedicated Spring Boot server managing game state, independent Swing client
+- **Network Communication**: Real-time game state synchronization over TCP sockets using JSON
+- **Spring Boot REST API**: Query server health and active player list via HTTP endpoints (`/api/status`, `/api/players`)
+- **Player Positions**: Real-time position updates across all connected clients
+- **Bombs & Explosions**: Server-authoritative bomb detonation and soft block destruction mechanics
+- **Collision Detection**: Server-authoritative wall and obstacle collision checks
 - **Respawn**: Press R to reset the game
 
 ## Requirements
 
 - Java 17 or higher
-- Maven 3.6+ (for building)
-- macOS or Linux (Windows support via WSL)
+- Maven 3.6+
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Build the Entire Project
 
-Make sure Maven is installed:
+From the project root directory:
 ```bash
-brew install maven  # macOS
-# or use your system's package manager
+mvn clean compile
+# or package executable JARs
+mvn clean package -DskipTests
 ```
 
-### 2. Start the Server
+### 2. Start the Server (Spring Boot)
 
+#### On Linux / macOS:
 ```bash
 chmod +x run-server.sh
 ./run-server.sh 9876
 ```
 
-The server will start on port 9876 (customizable).
-
-Output:
-```
-🎮 Bomberman Server started on port 9876
-⏳ Waiting for players to connect (2-4 players required)...
+#### On Windows:
+```cmd
+run-server.bat 9876
 ```
 
-### 3. Launch Client(s)
+#### Or using Maven directly:
+```bash
+cd server
+mvn spring-boot:run -Dspring-boot.run.arguments="9876"
+```
 
-In a new terminal, run:
+The Spring Boot server will start:
+- **TCP Game Socket**: `localhost:9876` (handles real-time game traffic)
+- **HTTP REST API**: `http://localhost:8080/api/status` (status and player count)
+
+### 3. Launch Client(s) (Java Swing)
+
+In a new terminal window for each player (2-4 players):
+
+#### On Linux / macOS:
 ```bash
 chmod +x run-client.sh
 ./run-client.sh localhost 9876
 ```
 
-This will open a connection dialog. Enter your player name and click "Connect".
+#### On Windows:
+```cmd
+run-client.bat localhost 9876
+```
 
-Repeat for each player (2-4 players total).
+#### Or using Maven directly:
+```bash
+cd client
+mvn exec:java -Dexec.args="localhost 9876"
+```
 
-### 4. Play!
+Enter your player name in the connection dialog and click **Connect**.
 
-Once at least 2 players are connected, the game will start automatically.
+### 4. Controls
 
-**Controls:**
 - **W**: Move up
 - **S**: Move down
 - **A**: Move left
@@ -67,202 +92,68 @@ Once at least 2 players are connected, the game will start automatically.
 - **SPACE**: Place bomb
 - **R**: Reset game
 
-## Advanced Usage
+---
 
-### Custom Port
+## Architecture & Decoupling
 
-```bash
-# Start server on custom port
-./run-server.sh 5555
-
-# Connect to custom port
-./run-client.sh localhost 5555
-```
-
-### Remote Connection
-
-To connect to a server on a different machine:
-```bash
-./run-client.sh <server-ip> 9876
-```
-
-### Manual Build and Run
-
-```bash
-# Build
-mvn clean package
-
-# Run server
-java -cp "target/classes:$(mvn dependency:build-classpath -q -Dmdep.outputFile=/dev/stdout)" \
-  com.example.server.GameServer 9876
-
-# Run client
-java -cp "target/classes:$(mvn dependency:build-classpath -q -Dmdep.outputFile=/dev/stdout)" \
-  com.example.MultiplayerApp localhost 9876
-```
-
-## Game Mechanics
-
-### Map
-- 13x11 tile grid
-- Hard walls (indestructible)
-- Soft blocks (destructible)
-- Floor tiles (walkable)
-
-### Players
-- 4 spawn corners (top-left, top-right, bottom-left, bottom-right)
-- Each player gets a unique color
-- Players are eliminated when hit by an explosion
-- Reset the game with R key
-
-### Bombs
-- Placed with SPACE
-- Explode after ~2 seconds
-- Blast radius of 2 tiles in each direction
-- Destroy soft blocks
-
-### Explosions
-- Visible for ~700ms
-- Kill any player in the blast area
-- Stop at hard walls and destroyed soft blocks
-
-## Architecture
-
-### Server (`GameServer.java`)
-- Accepts up to 4 client connections
-- Manages authoritative game state
-- Broadcasts state updates 10 times per second
-- Handles player input messages
-- Runs bomb/explosion physics
-
-### Client (`MultiplayerApp.java`, `NetworkClient.java`)
-- Connects to server
-- Sends player input (WASD, SPACE, R)
-- Receives game state updates
-- Renders all players and game objects
-- Updates local display at 60 FPS (configurable)
-
-### Network Protocol
-Messages are JSON-serialized and sent over TCP:
-
-**Player Join:**
-```json
-{
-  "messageType": "PLAYER_JOIN",
-  "playerName": "Alice"
-}
-```
-
-**Player Input:**
-```json
-{
-  "messageType": "PLAYER_INPUT",
-  "playerId": 1,
-  "action": "UP"
-}
-```
-
-**Game State:**
-```json
-{
-  "messageType": "GAME_STATE",
-  "gameState": {
-    "map": [...],
-    "players": [...],
-    "bombs": [...],
-    "explosions": [...]
-  }
-}
-```
-
-## Troubleshooting
-
-### "Connection refused" error
-- Make sure the server is running on the specified port
-- Check firewall settings
-- Verify correct hostname/IP
-
-### "Game is full" message
-- Maximum 4 players per game
-- Wait for a game to finish or start a new server on a different port
-
-### Game freezes or lags
-- Check network connection
-- Reduce firewall restrictions
-- Close other applications using network
-
-### Maven not found
-```bash
-brew install maven
-export PATH="/usr/local/bin:$PATH"  # Add to PATH if needed
-```
-
-## Project Structure
+The repository is organized following the multi-module principle:
 
 ```
-src/main/java/com/example/
-├── App.java                      # Original single-player app
-├── MultiplayerApp.java           # Multiplayer client launcher
-├── GameController.java           # Input handling (network version)
-├── MapPanel.java                 # Game rendering (multiplayer)
-├── Player.java                   # Local player
-├── Character.java                # Character base class
-├── GameObject.java               # Game object base
-├── Bomb.java                     # Bomb mechanics
-├── Explosion.java                # Explosion mechanics
-├── TileType.java                 # Map tile types
-├── DemoMapFactory.java           # Map generation
-├── client/
-│   └── NetworkClient.java        # Network communication (client-side)
-├── server/
-│   └── GameServer.java           # Game server (authoritative)
-└── network/
-    ├── GameMessage.java          # Message base class
-    ├── PlayerJoinMessage.java    # Join message
-    ├── PlayerInputMessage.java   # Input message
-    ├── GameStateMessage.java     # State message
-    ├── GameStateData.java        # Serializable state
-    └── ServerResponseMessage.java # Response message
+2012/
+├── pom.xml                                   # Root aggregator POM
+├── run-server.sh / run-server.bat           # Server launch scripts
+├── run-client.sh / run-client.bat           # Client launch scripts
+├── client/                                  # Swing Client Module
+│   ├── pom.xml
+│   └── src/main/java/com/example/client/
+│       ├── MultiplayerApp.java               # Client GUI entry point
+│       ├── App.java                          # Client demo launcher
+│       ├── MapPanel.java                     # Swing JPanel game renderer
+│       ├── GameController.java               # Swing input listener & state updater
+│       ├── Player.java                       # Local client player model
+│       ├── Character.java                    # Base character
+│       ├── GameObject.java                   # Base game object
+│       ├── Bomb.java                         # Client bomb representation
+│       ├── Explosion.java                    # Client explosion representation
+│       ├── TileType.java                     # Client tile type enum
+│       ├── DemoMapFactory.java               # Client map dimensions & preview
+│       └── network/
+│           ├── NetworkClient.java            # TCP socket client connection
+│           ├── GameMessage.java              # Client network message base
+│           ├── PlayerJoinMessage.java        # Join request DTO
+│           ├── PlayerInputMessage.java       # Input event DTO
+│           ├── GameStateMessage.java         # State broadcast DTO
+│           ├── GameStateData.java            # Serializable state DTO
+│           └── ServerResponseMessage.java     # Server response DTO
+└── server/                                  # Spring Boot Server Module
+    ├── pom.xml
+    └── src/main/
+        ├── java/com/example/server/
+        │   ├── ServerApplication.java       # Spring Boot main application class
+        │   ├── GameServer.java              # Authoritative game server (@Component, CommandLineRunner)
+        │   ├── GameConstants.java           # Server-side constants (tiles, dimensions, ports)
+        │   ├── controller/
+        │   │   └── ServerStatusController.java # Spring REST API (/api/status, /api/players)
+        │   ├── model/
+        │   │   ├── TileType.java            # Server tile type enum
+        │   │   ├── ServerPlayer.java        # Server player entity & physics
+        │   │   ├── ServerBomb.java          # Server bomb timer & detonation
+        │   │   ├── ServerExplosion.java     # Server explosion propagator
+        │   │   └── ServerMapFactory.java    # Authoritative map generator
+        │   └── network/
+        │       ├── ClientHandler.java       # TCP client socket thread handler
+        │       ├── GameMessage.java          # Server network message base
+        │       ├── PlayerJoinMessage.java    # Join request DTO
+        │       ├── PlayerInputMessage.java   # Input event DTO
+        │       ├── GameStateMessage.java     # State broadcast DTO
+        │       ├── GameStateData.java        # Serializable state DTO
+        │       └── ServerResponseMessage.java # Server response DTO
+        └── resources/
+            └── application.properties       # Server configuration (HTTP & TCP ports)
 ```
 
-## Development
+### No Shared Classes
 
-### Adding Features
-
-1. **New Game Mechanics**: Modify `GameServer` physics
-2. **New Messages**: Create new `GameMessage` subclass in `network/`
-3. **UI Improvements**: Modify `MapPanel.java` rendering
-4. **New Items/Power-ups**: Extend `GameStateData` and update serialization
-
-### Testing
-
-Run unit tests:
-```bash
-mvn test
-```
-
-## Known Limitations
-
-- No persistent storage (game state lost on server restart)
-- No spectator mode
-- No chat system
-- All players on same map only
-
-## Future Enhancements
-
-- [ ] Multiple game rooms/lobbies
-- [ ] Power-ups (speed, blast radius)
-- [ ] Player statistics tracking
-- [ ] Replay system
-- [ ] Mobile client support
-- [ ] Spectator mode
-- [ ] Custom map support
-- [ ] Game recording
-
-## License
-
-Educational/Open Source
-
-## Credits
-
-Original 2012 Bomberman implementation adapted for multiplayer.
+- `client` and `server` have separate `pom.xml` configurations.
+- Neither module imports or depends on classes from the other module.
+- All coordination is performed strictly over the network using TCP sockets and JSON payloads.

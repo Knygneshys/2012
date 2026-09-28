@@ -1,30 +1,26 @@
 #!/bin/bash
 
 # Bomberman Multiplayer - Client Launcher
-# This script builds and runs the game client
+# Builds and runs the Swing game client
 
 set -e
 
-echo "🎮 Bomberman Multiplayer - Client Launcher"
-echo "==========================================="
-
-# Check if Maven is installed
-if ! command -v mvn &> /dev/null; then
-    echo "❌ Maven is not installed. Installing Maven via Homebrew..."
-    brew install maven
-fi
+echo "🎮 Bomberman Multiplayer - Swing Client Launcher"
+echo "================================================="
 
 HOST=${1:-localhost}
-PORT=${2:-9876}
+PORT=${2:-8080}
 
-echo "📦 Building project..."
-mvn clean package -q -DskipTests
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/client"
+
+echo "📦 Building client..."
+mvn compile -q
 
 echo ""
-echo "🚀 Launching Bomberman Client"
-echo "=============================="
+echo "🚀 Launching Bomberman Swing Client"
+echo "===================================="
 echo "Connecting to: $HOST:$PORT"
 echo ""
 
-java -cp "target/classes:$(mvn dependency:build-classpath -q -Dmdep.outputFile=/dev/stdout)" com.example.MultiplayerApp $HOST $PORT
-
+mvn exec:java -Dexec.mainClass="com.example.client.MultiplayerApp" -Dexec.args="$HOST $PORT"

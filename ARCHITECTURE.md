@@ -26,14 +26,15 @@
                └─────────────────────────────────────────┘   │
                               ▼                                │
         ┌─────────────────────────────────────────────────────┐
-        │            GAME SERVER (CLI)                        │
-        │  Port: 9876 (configurable)                          │
+        │        SPRING BOOT GAME SERVER                      │
+        │  TCP Port: 9876 (configurable)                      │
+        │  HTTP REST Port: 8080                               │
         │                                                      │
         │  ┌────────────────────────────────────────────┐    │
-        │  │ GameServer.main()                          │    │
+        │  │ ServerApplication.main() / GameServer      │    │
         │  │ - Accepts 4 client connections             │    │
-        │  │ - Manages game loop (100ms ticks)          │    │
-        │  │ - Broadcasts state (10 FPS)                │    │
+        │  │ - Manages game loop (10ms ticks)           │    │
+        │  │ - Broadcasts state to TCP clients          │    │
         │  └────────────────┬───────────────────────────┘    │
         │                   │                                 │
         │  ┌────────────────▼───────────────────────────┐    │
