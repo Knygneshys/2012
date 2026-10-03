@@ -64,8 +64,10 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         System.out.println("[Server] Bomberman Game Server initialized with WebSocket endpoint: ws://localhost:" + port + "/ws/game");
         System.out.println("[Server] Waiting for players to connect (2-4 players required)...");
 
-        // Start physics / game update loop
-        executorService.submit(this::gameLoop);
+        // Start physics / game update loop. execute(), not submit(): submit()
+        // captures a failure in a Future nobody reads, so any exception thrown
+        // below would freeze the game for good without a word in the log.
+        executorService.execute(this::gameLoop);
     }
 
     private void gameLoop() {
@@ -86,6 +88,11 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
+            } catch (RuntimeException e) {
+                // One bad tick must not end the game for everyone.
+                System.err.println("[Server] Error in game loop: " + e);
+                e.printStackTrace();
+                lastUpdateTime = System.currentTimeMillis();
             }
         }
     }
@@ -167,39 +174,17 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
      */
     private void applyBlast(int tileX, int tileY) {
         for (ServerPlayer p : players.values()) {
-            if (p.alive && overlapsTile(p.x, p.y, tileX, tileY)) {
-                p.alive = false;
+            if (p.alive && p.overlapsTile(tileX, tileY)) {
+                p.kill();
                 System.out.println("[Server] Player " + p.name + " eliminated!");
             }
         }
         for (ServerNpc npc : npcs) {
-            if (npc.alive && overlapsTile(npc.x, npc.y, tileX, tileY)) {
+            if (npc.alive && npc.overlapsTile(tileX, tileY)) {
                 npc.kill();
                 System.out.println("[Server] NPC " + npc.id + " eliminated!");
             }
         }
-    }
-
-    /**
-     * True when a body at (x, y) covers any part of the given tile. Characters
-     * do not stay aligned to the tile grid, so a body can straddle two tiles
-     * and has to be caught by a blast hitting either of them.
-     */
-    private static boolean overlapsTile(int x, int y, int tileX, int tileY) {
-        int size = GameConstants.TILE_SIZE;
-        int blastX = tileX * size;
-        int blastY = tileY * size;
-        return x < blastX + size && x + size > blastX
-            && y < blastY + size && y + size > blastY;
-    }
-
-    /**
-     * True when two bodies share at least one pixel.
-     */
-    private static boolean bodiesOverlap(int ax, int ay, int bx, int by) {
-        int size = GameConstants.TILE_SIZE;
-        return ax < bx + size && ax + size > bx
-            && ay < by + size && ay + size > by;
     }
 
     /**
@@ -222,7 +207,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         while (it.hasNext()) {
             ServerPowerup powerup = it.next();
             for (ServerPlayer p : players.values()) {
-                if (p.alive && overlapsTile(p.x, p.y, powerup.tileX, powerup.tileY)) {
+                if (p.alive && p.overlapsTile(powerup.tileX, powerup.tileY)) {
                     powerup.applyTo(p);
                     System.out.println("[Server] Player " + p.name + " collected " + powerup.kind);
                     it.remove();
@@ -239,8 +224,8 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         for (ServerNpc npc : npcs) {
             if (!npc.alive) continue;
             for (ServerPlayer p : players.values()) {
-                if (p.alive && bodiesOverlap(p.x, p.y, npc.x, npc.y)) {
-                    p.alive = false;
+                if (p.alive && npc.overlaps(p)) {
+                    p.kill();
                     System.out.println("[Server] Player " + p.name + " caught by NPC " + npc.id + "!");
                 }
             }

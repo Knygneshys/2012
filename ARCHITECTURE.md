@@ -148,10 +148,11 @@ Package: com.example.client
 
 Package: com.example.server
 └── GameServer
-    ├── ServerPlayer (authoritative player)
+    ├── ServerCharacter (shared position, speed, alive, movement rule)
+    │   ├── ServerPlayer (authoritative player)
+    │   └── ServerNpc (authoritative NPC, wandering AI)
     ├── ServerBomb (authoritative bomb)
     ├── ServerExplosion (authoritative explosion)
-    ├── ServerNpc (authoritative NPC, wandering AI)
     ├── ServerPowerup (authoritative powerup drop)
     └── ClientHandler (socket thread handler)
 
@@ -179,6 +180,12 @@ The client owns the `GameObject` hierarchy and renders it; the server owns the
 authoritative simulation (`ServerNpc` / `ServerPowerup` mirroring `NPC` /
 `Powerup`) and ships it as `NpcData` / `PowerupData`, exactly like it already
 does for players. The two modules share no classes.
+
+Both sides mirror the same idea for different reasons. The client's
+`GameObject` tree exists because it renders: `MapPanel` walks one list and
+picks a draw routine per object. The server's `ServerCharacter` exists because
+it simulates: `ServerPlayer` and `ServerNpc` obey exactly one movement and
+overlap rule instead of two copies that can drift apart.
 
 ## Data Flow Diagram
 
