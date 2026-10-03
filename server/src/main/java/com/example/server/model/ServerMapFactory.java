@@ -1,0 +1,53 @@
+package com.example.server.model;
+
+import com.example.server.GameConstants;
+import java.util.Random;
+
+public final class ServerMapFactory {
+    private ServerMapFactory() {}
+
+    public static TileType[][] createDefaultMap() {
+        TileType[][] map = new TileType[GameConstants.MAP_HEIGHT][GameConstants.MAP_WIDTH];
+
+        for (int y = 0; y < GameConstants.MAP_HEIGHT; y++) {
+            for (int x = 0; x < GameConstants.MAP_WIDTH; x++) {
+                map[y][x] = TileType.FLOOR;
+            }
+        }
+
+        for (int y = 0; y < GameConstants.MAP_HEIGHT; y++) {
+            for (int x = 0; x < GameConstants.MAP_WIDTH; x++) {
+                boolean border = y == 0 || y == GameConstants.MAP_HEIGHT - 1 || x == 0 || x == GameConstants.MAP_WIDTH - 1;
+                boolean hardWallPattern = y % 2 == 0 && x % 2 == 0;
+                if (border || hardWallPattern) {
+                    map[y][x] = TileType.HARD_WALL;
+                }
+            }
+        }
+
+        // Randomize soft blocks
+        Random rnd = new Random();
+        double softBlockProbability = 0.35;
+        for (int y = 1; y < GameConstants.MAP_HEIGHT - 1; y++) {
+            for (int x = 1; x < GameConstants.MAP_WIDTH - 1; x++) {
+                if (map[y][x] == TileType.FLOOR && rnd.nextDouble() < softBlockProbability) {
+                    map[y][x] = TileType.SOFT_BLOCK;
+                }
+            }
+        }
+
+        clearSpawnArea(map, 1, 1);
+        clearSpawnArea(map, GameConstants.MAP_WIDTH - 2, 1);
+        clearSpawnArea(map, 1, GameConstants.MAP_HEIGHT - 2);
+        clearSpawnArea(map, GameConstants.MAP_WIDTH - 2, GameConstants.MAP_HEIGHT - 2);
+        return map;
+    }
+
+    private static void clearSpawnArea(TileType[][] map, int x, int y) {
+        map[y][x] = TileType.FLOOR;
+        map[y][x - 1] = TileType.FLOOR;
+        map[y][x + 1] = TileType.FLOOR;
+        map[y - 1][x] = TileType.FLOOR;
+        map[y + 1][x] = TileType.FLOOR;
+    }
+}
