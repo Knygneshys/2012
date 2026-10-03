@@ -148,13 +148,16 @@ Package: com.example.client
 
 Package: com.example.server
 └── GameServer
-    ├── ServerCharacter (shared position, speed, alive, movement rule)
-    │   ├── ServerPlayer (authoritative player)
-    │   └── ServerNpc (authoritative NPC, wandering AI)
-    ├── ServerBomb (authoritative bomb)
-    ├── ServerExplosion (authoritative explosion)
-    ├── ServerPowerup (authoritative powerup drop)
-    └── ClientHandler (socket thread handler)
+    └── ServerGameObject (shared tile anchor)
+        ├── ServerCharacter (position, speed, alive, the movement rule)
+        │   ├── ServerPlayer (authoritative player)
+        │   └── ServerNpc (authoritative NPC, wandering AI)
+        ├── ServerBlock (a tile of the map)
+        │   ├── ServerWall (impassable, survives and stops blasts)
+        │   ├── ServerBreakableWall (impassable, a blast turns it into a Passage)
+        │   └── ServerPassage (empty walkable ground)
+        ├── ServerBomb (authoritative bomb)
+        └── ServerPowerup (authoritative powerup drop)
 
 Package: com.example.client.network
 └── NetworkClient
@@ -181,11 +184,21 @@ authoritative simulation (`ServerNpc` / `ServerPowerup` mirroring `NPC` /
 `Powerup`) and ships it as `NpcData` / `PowerupData`, exactly like it already
 does for players. The two modules share no classes.
 
-Both sides mirror the same idea for different reasons. The client's
-`GameObject` tree exists because it renders: `MapPanel` walks one list and
-picks a draw routine per object. The server's `ServerCharacter` exists because
-it simulates: `ServerPlayer` and `ServerNpc` obey exactly one movement and
-overlap rule instead of two copies that can drift apart.
+Both sides mirror the same idea. Every drawable and every simulated thing hangs
+off a root that answers "where is this" (`GameObject` / `ServerGameObject`), and
+both sides group their map tiles into a `Block` hierarchy so passability,
+blast-stopping and destruction are answered by the tile rather than by comparing
+constants at each call site. What differs is why:
+
+- The client renders, so `Block.color()` exists and `GameObject` carries pixel
+  geometry and colour.
+- The server simulates, so `Block` has no colour and `ServerCharacter.move()`
+  takes a `ServerBlock[][]` and asks `isPassable()`. `ServerGameObject` is only
+  a shared contract, since nothing dispatches over it; `ServerExplosion` is
+  deliberately outside it because a blast covers many tiles rather than one.
+
+`TileType` stays the wire format on both sides, so its ordinal order is part of
+the protocol and must not change.
 
 ## Data Flow Diagram
 

@@ -29,7 +29,7 @@ public class ServerNpc extends ServerCharacter {
     /**
      * Advances the NPC by one tick.
      */
-    public void tick(int deltaMs, TileType[][] map) {
+    public void tick(int deltaMs, ServerBlock[][] map) {
         if (!alive) return;
 
         directionTimerMs -= deltaMs;
@@ -51,7 +51,7 @@ public class ServerNpc extends ServerCharacter {
     /**
      * Moves one step in the current direction, if that is possible.
      */
-    private boolean step(TileType[][] map) {
+    private boolean step(ServerBlock[][] map) {
         int[] dir = DIRECTIONS[direction];
         return move(dir[0] * moveSpeed, dir[1] * moveSpeed, map);
     }

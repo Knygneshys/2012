@@ -1,6 +1,6 @@
 package com.example.server.model;
 
-public class ServerBomb {
+public class ServerBomb extends ServerGameObject {
     public int tileX;
     public int tileY;
     public int remainingMs;
@@ -20,6 +20,16 @@ public class ServerBomb {
         this.remainingMs = fuseMs;
         this.radius = radius;
         this.ownerId = ownerId;
+    }
+
+    @Override
+    public int tileX() {
+        return tileX;
+    }
+
+    @Override
+    public int tileY() {
+        return tileY;
     }
 
     public boolean tick(int deltaMs) {

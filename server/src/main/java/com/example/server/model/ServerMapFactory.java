@@ -6,7 +6,24 @@ import java.util.Random;
 public final class ServerMapFactory {
     private ServerMapFactory() {}
 
-    public static TileType[][] createDefaultMap() {
+    public static ServerBlock[][] createDefaultMap() {
+        TileType[][] layout = createLayout();
+        ServerBlock[][] map = new ServerBlock[layout.length][layout[0].length];
+
+        for (int y = 0; y < layout.length; y++) {
+            for (int x = 0; x < layout[0].length; x++) {
+                map[y][x] = ServerBlock.create(x, y, layout[y][x]);
+            }
+        }
+        return map;
+    }
+
+    /**
+     * Lays out the map as plain tile types, which is how it is described before
+     * it becomes blocks. The wire format sends these ordinals, so the enum order
+     * is part of the protocol.
+     */
+    private static TileType[][] createLayout() {
         TileType[][] map = new TileType[GameConstants.MAP_HEIGHT][GameConstants.MAP_WIDTH];
 
         for (int y = 0; y < GameConstants.MAP_HEIGHT; y++) {

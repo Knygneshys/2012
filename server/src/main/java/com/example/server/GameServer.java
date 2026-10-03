@@ -1,12 +1,12 @@
 package com.example.server;
 
 import com.example.server.model.ServerBomb;
+import com.example.server.model.ServerBlock;
 import com.example.server.model.ServerExplosion;
 import com.example.server.model.ServerMapFactory;
 import com.example.server.model.ServerNpc;
 import com.example.server.model.ServerPlayer;
 import com.example.server.model.ServerPowerup;
-import com.example.server.model.TileType;
 import com.example.server.network.GameStateData;
 import com.example.server.network.GameStateMessage;
 import com.example.server.network.PlayerInputMessage;
@@ -38,7 +38,7 @@ public class GameServer implements CommandLineRunner {
     private final Map<Integer, WebSocketSession> clientSessions = Collections.synchronizedMap(new LinkedHashMap<>());
 private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronizedMap(new HashMap<>());
     // Authoritative game state
-    private TileType[][] map;
+    private ServerBlock[][] map;
     private final Map<Integer, ServerPlayer> players = Collections.synchronizedMap(new LinkedHashMap<>());
     private final List<ServerBomb> bombs = Collections.synchronizedList(new ArrayList<>());
     private final List<ServerExplosion> explosions = Collections.synchronizedList(new ArrayList<>());
@@ -154,14 +154,22 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
                 int nx = bx + d[0] * step;
                 int ny = by + d[1] * step;
                 if (nx < 0 || ny < 0 || ny >= map.length || nx >= map[0].length) break;
-                if (map[ny][nx] == TileType.HARD_WALL) break;
-                ex.addTile(nx, ny);
-                // destroy soft block
-                if (map[ny][nx] == TileType.SOFT_BLOCK) {
-                    map[ny][nx] = TileType.FLOOR;
+
+                ServerBlock block = map[ny][nx];
+                if (block.isDestructible()) {
+                    // A breakable wall is swallowed by the blast: it shows up in
+                    // the fire, turns into a passage and may drop a powerup.
+                    ex.addTile(nx, ny);
+                    map[ny][nx] = block.destroyed();
                     maybeSpawnPowerup(nx, ny);
                     break;
                 }
+                if (block.stopsBlast()) {
+                    // A wall survives, so the blast neither reaches nor passes it.
+                    break;
+                }
+
+                ex.addTile(nx, ny);
                 // check characters in the blast
                 applyBlast(nx, ny);
             }
@@ -255,7 +263,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         for (int attempt = 0; attempt < GameConstants.NPC_SPAWN_ATTEMPTS; attempt++) {
             int x = 1 + random.nextInt(GameConstants.MAP_WIDTH - 2);
             int y = 1 + random.nextInt(GameConstants.MAP_HEIGHT - 2);
-            if (map[y][x] != TileType.FLOOR) continue;
+            if (!map[y][x].isPassable()) continue;
             if (tooCloseToPlayerSpawn(x, y)) continue;
             return new int[]{x, y};
         }
@@ -306,10 +314,11 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         GameStateData data = new GameStateData();
         data.map = new int[map.length][map[0].length];
 
-        // Convert map
+        // Convert map. The wire format is the TileType ordinal, so the blocks
+        // carry their type rather than being described directly.
         for (int y = 0; y < map.length; y++) {
             for (int x = 0; x < map[0].length; x++) {
-                data.map[y][x] = map[y][x].ordinal();
+                data.map[y][x] = map[y][x].tileType().ordinal();
             }
         }
 

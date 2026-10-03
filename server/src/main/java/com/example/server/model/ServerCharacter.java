@@ -11,7 +11,7 @@ import com.example.server.GameConstants;
  * A body is always {@link GameConstants#TILE_SIZE} square, which is what the
  * overlap helpers below assume.
  */
-public abstract class ServerCharacter {
+public abstract class ServerCharacter extends ServerGameObject {
 
     public final int id;
     public int x, y;
@@ -27,10 +27,10 @@ public abstract class ServerCharacter {
 
     /**
      * Moves the body by (dx, dy), but only when it stays fully inside the map
-     * and every tile it would then cover is floor. A dead body never moves.
-     * Returns true when it actually moved.
+     * and every tile it would then cover is a passable {@link ServerBlock}. A
+     * dead body never moves. Returns true when it actually moved.
      */
-    public boolean move(int dx, int dy, TileType[][] map) {
+    public boolean move(int dx, int dy, ServerBlock[][] map) {
         if (!alive) return false;
         if (dx == 0 && dy == 0) return false;
         if (map == null || map.length == 0 || map[0].length == 0) return false;
@@ -46,10 +46,10 @@ public abstract class ServerCharacter {
         }
 
         // Collision check with the four corners of the body.
-        if (!isFloor(map, newX, newY)
-            || !isFloor(map, newX + size - 1, newY)
-            || !isFloor(map, newX, newY + size - 1)
-            || !isFloor(map, newX + size - 1, newY + size - 1)) {
+        if (!isPassableAt(map, newX, newY)
+            || !isPassableAt(map, newX + size - 1, newY)
+            || !isPassableAt(map, newX, newY + size - 1)
+            || !isPassableAt(map, newX + size - 1, newY + size - 1)) {
             return false;
         }
 
@@ -65,10 +65,12 @@ public abstract class ServerCharacter {
         this.alive = false;
     }
 
+    @Override
     public int tileX() {
         return x / GameConstants.TILE_SIZE;
     }
 
+    @Override
     public int tileY() {
         return y / GameConstants.TILE_SIZE;
     }
@@ -95,12 +97,12 @@ public abstract class ServerCharacter {
             && y < other.y + size && y + size > other.y;
     }
 
-    protected static boolean isFloor(TileType[][] map, int px, int py) {
+    protected static boolean isPassableAt(ServerBlock[][] map, int px, int py) {
         int tileX = px / GameConstants.TILE_SIZE;
         int tileY = py / GameConstants.TILE_SIZE;
         if (tileX < 0 || tileY < 0 || tileY >= map.length || tileX >= map[0].length) {
             return false;
         }
-        return map[tileY][tileX] == TileType.FLOOR;
+        return map[tileY][tileX].isPassable();
     }
 }
