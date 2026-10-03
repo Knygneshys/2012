@@ -38,12 +38,14 @@
         │  └────────────────┬───────────────────────────┘    │
         │                   │                                 │
         │  ┌────────────────▼───────────────────────────┐    │
-        │  │ Game State                                 │    │
-        │  │ - TileType[][] map                         │    │
-        │  │ - Map<Integer, ServerPlayer> players       │    │
-        │  │ - List<ServerBomb> bombs                   │    │
-        │  │ - List<ServerExplosion> explosions         │    │
-        │  └────────────────┬───────────────────────────┘    │
+│  │ Game State                                 │    │
+         │  │ - TileType[][] map                         │    │
+         │  │ - Map<Integer, ServerPlayer> players       │    │
+         │  │ - List<ServerBomb> bombs                   │    │
+         │  │ - List<ServerExplosion> explosions         │    │
+         │  │ - List<ServerNpc> npcs                     │    │
+         │  │ - List<ServerPowerup> powerups             │    │
+         │  └────────────────┬───────────────────────────┘    │
         │                   │                                 │
         │  ┌────────────────▼───────────────────────────┐    │
         │  │ Game Logic                                 │    │
@@ -125,12 +127,17 @@ PLAYER LEAVING:
 ## Class Hierarchy
 
 ```
-Package: com.example
-├── GameObject (abstract)
-│   ├── Character (abstract)
-│   │   └── Player (local player)
-│   └── (other game objects)
-├── Bomb (bomb mechanics)
+Package: com.example.client
+├── GameObject (abstract) - position + size, root of everything in the world
+│   ├── Character (abstract) - shared movement, speed, colour, alive flag
+│   │   ├── Player (local player, powerup bonuses)
+│   │   └── NPC (server simulated non player character)
+│   ├── Bomb (fuse timer, blast radius, owner)
+│   ├── Powerup (EXTRA_BOMB / BIGGER_BOMB / FASTER)
+│   └── Block (abstract) - one map tile
+│       ├── Wall (indestructible, stops blasts)
+│       ├── BreakableWall (destroyed by a blast, leaves a Passage)
+│       └── Passage (walkable floor)
 ├── Explosion (explosion mechanics)
 ├── TileType (enum)
 ├── DemoMapFactory (map generation)
@@ -141,12 +148,14 @@ Package: com.example
 
 Package: com.example.server
 └── GameServer
-    ├── ServerPlayer (inner class)
-    ├── ServerBomb (inner class)
-    ├── ServerExplosion (inner class)
-    └── ClientHandler (inner class, Runnable)
+    ├── ServerPlayer (authoritative player)
+    ├── ServerBomb (authoritative bomb)
+    ├── ServerExplosion (authoritative explosion)
+    ├── ServerNpc (authoritative NPC, wandering AI)
+    ├── ServerPowerup (authoritative powerup drop)
+    └── ClientHandler (socket thread handler)
 
-Package: com.example.client
+Package: com.example.client.network
 └── NetworkClient
     ├── Connection management
     ├── Message sending
@@ -161,8 +170,15 @@ Package: com.example.network
 └── GameStateData (nested classes for serialization)
     ├── PlayerData
     ├── BombData
-    └── ExplosionData
+    ├── ExplosionData
+    ├── NpcData
+    └── PowerupData
 ```
+
+The client owns the `GameObject` hierarchy and renders it; the server owns the
+authoritative simulation (`ServerNpc` / `ServerPowerup` mirroring `NPC` /
+`Powerup`) and ships it as `NpcData` / `PowerupData`, exactly like it already
+does for players. The two modules share no classes.
 
 ## Data Flow Diagram
 
@@ -330,11 +346,21 @@ BOMB PLACEMENT SEQUENCE:
 6. Server: handlePlayerInput() with action="BOMB"
 7. Server: placeBomb(player) creates ServerBomb
 8. Next gameLoop tick: bomb added to state
-9. gameLoop: 10 ticks later (1000ms = fuse time)
+9. gameLoop: 20 ticks later (2000ms = fuse time)
 10. gameLoop: detonate(bomb)
-11. gameLoop: createExplosion(), checkPlayersKill()
-12. broadcastGameState: bomb gone, explosion appears
-13. Client: Renders explosion, players update
+11. gameLoop: createExplosion(), applyBlast() kills players and NPCs on the tiles
+12. gameLoop: SOFT_BLOCK tiles become FLOOR and may drop a ServerPowerup
+13. broadcastGameState: bomb gone, explosion appears, map and powerups updated
+14. Client: MapPanel rebuilds its Block view, renders explosion, players update
+
+POWERUP COLLECTION SEQUENCE:
+1. Server: maybeSpawnPowerup() on a destroyed breakable wall
+2. broadcastGameState: powerups list includes the new drop
+3. Client: MapPanel.updatePowerups() builds Powerup objects for rendering
+4. Player walks onto the tile
+5. Server: collectPowerups() applies the bonus and removes the drop
+6. Server: bomb placement then honours the new bomb limit / radius
+7. broadcastGameState: powerups list is empty again, player stats updated
 ```
 
 ## Performance Profile

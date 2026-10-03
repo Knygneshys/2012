@@ -3,7 +3,9 @@ package com.example.server;
 import com.example.server.model.ServerBomb;
 import com.example.server.model.ServerExplosion;
 import com.example.server.model.ServerMapFactory;
+import com.example.server.model.ServerNpc;
 import com.example.server.model.ServerPlayer;
+import com.example.server.model.ServerPowerup;
 import com.example.server.model.TileType;
 import com.example.server.network.GameStateData;
 import com.example.server.network.GameStateMessage;
@@ -34,21 +36,23 @@ public class GameServer implements CommandLineRunner {
     private int port = GameConstants.DEFAULT_PORT;
 
     private final Map<Integer, WebSocketSession> clientSessions = Collections.synchronizedMap(new LinkedHashMap<>());
-    private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronizedMap(new HashMap<>());
-    private int nextPlayerId = 1;
-
+private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronizedMap(new HashMap<>());
     // Authoritative game state
     private TileType[][] map;
     private final Map<Integer, ServerPlayer> players = Collections.synchronizedMap(new LinkedHashMap<>());
     private final List<ServerBomb> bombs = Collections.synchronizedList(new ArrayList<>());
     private final List<ServerExplosion> explosions = Collections.synchronizedList(new ArrayList<>());
+    private final List<ServerNpc> npcs = Collections.synchronizedList(new ArrayList<>());
+    private final List<ServerPowerup> powerups = Collections.synchronizedList(new ArrayList<>());
 
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private volatile boolean running = true;
     private final Gson gson = new Gson();
+    private final Random random = new Random();
 
     public GameServer() {
         this.map = ServerMapFactory.createDefaultMap();
+        spawnNpcs();
     }
 
     public static void main(String[] args) {
@@ -99,6 +103,12 @@ public class GameServer implements CommandLineRunner {
             bombs.remove(b);
         }
 
+        // Move NPCs before the fire is applied, so walking into a burning tile cannot
+        // survive until the next tick
+        for (ServerNpc npc : npcs) {
+            npc.tick(deltaMs, map);
+        }
+
         // Update explosions
         Iterator<ServerExplosion> it = explosions.iterator();
         while (it.hasNext()) {
@@ -108,6 +118,17 @@ public class GameServer implements CommandLineRunner {
                 it.remove();
             }
         }
+
+        // Burning tiles keep hurting whatever stands in them, so a character
+        // that walks into a live explosion is caught by it too
+        for (ServerExplosion ex : explosions) {
+            for (int[] tile : ex.tiles) {
+                applyBlast(tile[0], tile[1]);
+            }
+        }
+
+        checkNpcContact();
+        collectPowerups();
     }
 
     private void detonate(ServerBomb b) {
@@ -117,7 +138,7 @@ public class GameServer implements CommandLineRunner {
 
         // center
         ex.addTile(bx, by);
-        checkPlayersKill(bx, by);
+        applyBlast(bx, by);
 
         // four directions
         int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
@@ -131,26 +152,144 @@ public class GameServer implements CommandLineRunner {
                 // destroy soft block
                 if (map[ny][nx] == TileType.SOFT_BLOCK) {
                     map[ny][nx] = TileType.FLOOR;
+                    maybeSpawnPowerup(nx, ny);
                     break;
                 }
-                // check players
-                checkPlayersKill(nx, ny);
+                // check characters in the blast
+                applyBlast(nx, ny);
             }
         }
         explosions.add(ex);
     }
 
-    private void checkPlayersKill(int tileX, int tileY) {
+    /**
+     * Applies a blast to a single tile, eliminating whatever stands on it.
+     */
+    private void applyBlast(int tileX, int tileY) {
         for (ServerPlayer p : players.values()) {
-            if (p.alive) {
-                int playerTileX = p.x / GameConstants.TILE_SIZE;
-                int playerTileY = p.y / GameConstants.TILE_SIZE;
-                if (playerTileX == tileX && playerTileY == tileY) {
-                    p.alive = false;
-                    System.out.println("[Server] Player " + p.name + " eliminated!");
+            if (p.alive && overlapsTile(p.x, p.y, tileX, tileY)) {
+                p.alive = false;
+                System.out.println("[Server] Player " + p.name + " eliminated!");
+            }
+        }
+        for (ServerNpc npc : npcs) {
+            if (npc.alive && overlapsTile(npc.x, npc.y, tileX, tileY)) {
+                npc.kill();
+                System.out.println("[Server] NPC " + npc.id + " eliminated!");
+            }
+        }
+    }
+
+    /**
+     * True when a body at (x, y) covers any part of the given tile. Characters
+     * do not stay aligned to the tile grid, so a body can straddle two tiles
+     * and has to be caught by a blast hitting either of them.
+     */
+    private static boolean overlapsTile(int x, int y, int tileX, int tileY) {
+        int size = GameConstants.TILE_SIZE;
+        int blastX = tileX * size;
+        int blastY = tileY * size;
+        return x < blastX + size && x + size > blastX
+            && y < blastY + size && y + size > blastY;
+    }
+
+    /**
+     * True when two bodies share at least one pixel.
+     */
+    private static boolean bodiesOverlap(int ax, int ay, int bx, int by) {
+        int size = GameConstants.TILE_SIZE;
+        return ax < bx + size && ax + size > bx
+            && ay < by + size && ay + size > by;
+    }
+
+    /**
+     * Drops a powerup on the tile a breakable wall was just destroyed on.
+     */
+    private void maybeSpawnPowerup(int tileX, int tileY) {
+        if (powerups.size() >= GameConstants.MAX_POWERUPS) return;
+        if (random.nextDouble() >= GameConstants.POWERUP_DROP_CHANCE) return;
+
+        ServerPowerup powerup = new ServerPowerup(ServerPowerup.Kind.random(random), tileX, tileY);
+        powerups.add(powerup);
+        System.out.println("[Server] Dropped " + powerup.kind + " at " + tileX + "," + tileY);
+    }
+
+    /**
+     * Players walk onto a powerup tile to collect it.
+     */
+    private void collectPowerups() {
+        Iterator<ServerPowerup> it = powerups.iterator();
+        while (it.hasNext()) {
+            ServerPowerup powerup = it.next();
+            for (ServerPlayer p : players.values()) {
+                if (p.alive && overlapsTile(p.x, p.y, powerup.tileX, powerup.tileY)) {
+                    powerup.applyTo(p);
+                    System.out.println("[Server] Player " + p.name + " collected " + powerup.kind);
+                    it.remove();
+                    break;
                 }
             }
         }
+    }
+
+    /**
+     * An NPC sharing a tile with a player takes it down with it.
+     */
+    private void checkNpcContact() {
+        for (ServerNpc npc : npcs) {
+            if (!npc.alive) continue;
+            for (ServerPlayer p : players.values()) {
+                if (p.alive && bodiesOverlap(p.x, p.y, npc.x, npc.y)) {
+                    p.alive = false;
+                    System.out.println("[Server] Player " + p.name + " caught by NPC " + npc.id + "!");
+                }
+            }
+        }
+    }
+
+    /**
+     * Places a fresh NPC on a random free tile, away from the player spawns.
+     */
+    private void spawnNpcs() {
+        npcs.clear();
+        for (int i = 0; i < GameConstants.NPC_COUNT; i++) {
+            int[] spot = findFreeTile();
+            if (spot == null) break;
+
+            ServerNpc npc = new ServerNpc(i + 1,
+                    spot[0] * GameConstants.TILE_SIZE,
+                    spot[1] * GameConstants.TILE_SIZE,
+                    GameConstants.NPC_MOVE_SPEED,
+                    GameConstants.NPC_COLORS[i % GameConstants.NPC_COLORS.length],
+                    random);
+            npcs.add(npc);
+        }
+    }
+
+    private int[] findFreeTile() {
+        for (int attempt = 0; attempt < GameConstants.NPC_SPAWN_ATTEMPTS; attempt++) {
+            int x = 1 + random.nextInt(GameConstants.MAP_WIDTH - 2);
+            int y = 1 + random.nextInt(GameConstants.MAP_HEIGHT - 2);
+            if (map[y][x] != TileType.FLOOR) continue;
+            if (tooCloseToPlayerSpawn(x, y)) continue;
+            return new int[]{x, y};
+        }
+        return null;
+    }
+
+    /**
+     * Keeps NPCs away from the tiles players spawn on, so nobody is caught
+     * before the round has started.
+     */
+    private boolean tooCloseToPlayerSpawn(int x, int y) {
+        for (int i = 0; i < GameConstants.MAX_PLAYERS; i++) {
+            int dx = Math.abs(x - GameConstants.SPAWN_X[i]);
+            int dy = Math.abs(y - GameConstants.SPAWN_Y[i]);
+            if (dx <= GameConstants.NPC_SPAWN_CLEARANCE && dy <= GameConstants.NPC_SPAWN_CLEARANCE) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void broadcastGameState() {
@@ -208,6 +347,17 @@ public class GameServer implements CommandLineRunner {
                 tiles[i] = ex.tiles.get(i);
             }
             data.explosions.add(new GameStateData.ExplosionData(tiles, ex.remainingMs));
+        }
+
+        // Convert NPCs
+        for (ServerNpc npc : npcs) {
+            data.npcs.add(new GameStateData.NpcData(npc.id, npc.x, npc.y, npc.moveSpeed, npc.alive, npc.colorHex));
+        }
+
+        // Convert powerups
+        for (ServerPowerup powerup : powerups) {
+            data.powerups.add(new GameStateData.PowerupData(
+                    powerup.kind.ordinal(), powerup.tileX, powerup.tileY));
         }
 
         return data;
@@ -295,13 +445,28 @@ public class GameServer implements CommandLineRunner {
             if (b.tileX == tileX && b.tileY == tileY) return;
         }
 
-        bombs.add(new ServerBomb(tileX, tileY, 2000, 2));
+        // Respect the bomb limit the player currently has
+        if (countBombsOf(p) >= p.maxBombs) return;
+
+        bombs.add(new ServerBomb(tileX, tileY, GameConstants.BOMB_FUSE_MS, p.bombRadius, p.id));
+    }
+
+    private int countBombsOf(ServerPlayer p) {
+        int count = 0;
+        for (ServerBomb b : bombs) {
+            if (b.ownerId == p.id) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private synchronized void resetGame() {
         map = ServerMapFactory.createDefaultMap();
         bombs.clear();
         explosions.clear();
+        powerups.clear();
+        spawnNpcs();
         for (ServerPlayer p : players.values()) {
             p.reset();
         }
@@ -309,10 +474,15 @@ public class GameServer implements CommandLineRunner {
     }
 
     private synchronized int allocatePlayerId() {
-        if (nextPlayerId > GameConstants.MAX_PLAYERS) {
-            return -1; // Game full
+        // Hand out the lowest free slot. A monotonic counter would lock the
+        // game out for good once MAX_PLAYERS joins had happened, even with
+        // nobody connected, and ids must stay within the spawn table anyway.
+        for (int id = 1; id <= GameConstants.MAX_PLAYERS; id++) {
+            if (!players.containsKey(id)) {
+                return id;
+            }
         }
-        return nextPlayerId++;
+        return -1; // Game full
     }
 
     public boolean isRunning() {

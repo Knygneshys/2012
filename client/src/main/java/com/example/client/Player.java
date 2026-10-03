@@ -3,10 +3,25 @@ package com.example.client;
 import java.awt.Color;
 
 public class Player extends Character {
+    public static final int DEFAULT_MAX_BOMBS = 1;
+    public static final int DEFAULT_BOMB_RADIUS = 2;
+
     public String name;
-    public boolean alive = true;
+    /**
+     * Id the server assigned to this player, or -1 while offline.
+     */
+    public int id = -1;
     public final Color initialColor;
     public final int initialMoveSpeed;
+
+    /**
+     * How many bombs this player may have on the map at the same time.
+     */
+    public int maxBombs = DEFAULT_MAX_BOMBS;
+    /**
+     * How far the bombs of this player spread. Both are raised by powerups.
+     */
+    public int bombRadius = DEFAULT_BOMB_RADIUS;
 
     public Player(int x, int y, int moveSpeed, String name, Color color, int width, int height) {
         super(x, y, moveSpeed, color, width, height);
@@ -15,30 +30,15 @@ public class Player extends Character {
         this.initialMoveSpeed = moveSpeed;
     }
 
-    public void move(int dx, int dy, TileType[][] map) {
-        if (!alive) return;
-        if (position.x() + dx < 0 || position.x() + dx >= map[0].length * MapPanel.TILE_SIZE ||
-            position.y() + dy < 0 || position.y() + dy >= map.length * MapPanel.TILE_SIZE) {
-            return;
-        }
-        GameObject.Position newPos = new Position(position.x() + dx, position.y() + dy);
-        GameObject.Position corn1 = new Position(newPos.x() + width - 1, newPos.y());
-        GameObject.Position corn2 = new Position(newPos.x(), newPos.y() + height - 1);
-        GameObject.Position corn3 = new Position(newPos.x() + width - 1, newPos.y() + height - 1);
-        int tileX = newPos.x() / MapPanel.TILE_SIZE;
-        int tileY = newPos.y() / MapPanel.TILE_SIZE;
-
-        int tileX1 = corn1.x() / MapPanel.TILE_SIZE;
-        int tileY1 = corn1.y() / MapPanel.TILE_SIZE;
-        int tileX2 = corn2.x() / MapPanel.TILE_SIZE;
-        int tileY2 = corn2.y() / MapPanel.TILE_SIZE;
-        int tileX3 = corn3.x() / MapPanel.TILE_SIZE;
-        int tileY3 = corn3.y() / MapPanel.TILE_SIZE;
-
-        if (map[tileY][tileX] != TileType.FLOOR || map[tileY1][tileX1] != TileType.FLOOR ||
-            map[tileY2][tileX2] != TileType.FLOOR || map[tileY3][tileX3] != TileType.FLOOR) {
-            return;
-        }
-        position = newPos;
+    /**
+     * Restores the state a player starts a round with, undoing powerup bonuses.
+     */
+    public void reset(int x, int y) {
+        setPosition(x, y);
+        alive = true;
+        color = initialColor;
+        moveSpeed = initialMoveSpeed;
+        maxBombs = DEFAULT_MAX_BOMBS;
+        bombRadius = DEFAULT_BOMB_RADIUS;
     }
 }

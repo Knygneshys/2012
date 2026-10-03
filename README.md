@@ -18,6 +18,8 @@ The client and server are completely decoupled: they do **not** share classes or
 - **Spring Boot REST API**: Query server health and active player list via HTTP endpoints (`/api/status`, `/api/players`)
 - **Player Positions**: Real-time position updates across all connected clients
 - **Bombs & Explosions**: Server-authoritative bomb detonation and soft block destruction mechanics
+- **NPCs**: Server-simulated wandering characters that eliminate players they run into and die in blasts
+- **Powerups**: Breakable walls sometimes drop a bonus (extra bomb, bigger blast, more speed) that players collect by walking over it
 - **Collision Detection**: Server-authoritative wall and obstacle collision checks
 - **Respawn**: Press R to reset the game
 
@@ -110,15 +112,21 @@ The repository is organized following the multi-module principle:
 │       ├── App.java                          # Client demo launcher
 │       ├── MapPanel.java                     # Swing JPanel game renderer
 │       ├── GameController.java               # Swing input listener & state updater
+│       ├── GameObject.java                   # Base game object (position + size)
+│       ├── Character.java                    # Base character (movement, colour, alive)
 │       ├── Player.java                       # Local client player model
-│       ├── Character.java                    # Base character
-│       ├── GameObject.java                   # Base game object
+│       ├── NPC.java                          # Server simulated non player character
 │       ├── Bomb.java                         # Client bomb representation
+│       ├── Powerup.java                      # Collectable bonus item
+│       ├── Block.java                        # Base map tile
+│       ├── Wall.java                         # Indestructible tile
+│       ├── BreakableWall.java                # Destructible tile
+│       ├── Passage.java                      # Walkable tile
 │       ├── Explosion.java                    # Client explosion representation
 │       ├── TileType.java                     # Client tile type enum
 │       ├── DemoMapFactory.java               # Client map dimensions & preview
 │       └── network/
-│           ├── NetworkClient.java            # TCP socket client connection
+│           ├── NetworkClient.java            # WebSocket client connection
 │           ├── GameMessage.java              # Client network message base
 │           ├── PlayerJoinMessage.java        # Join request DTO
 │           ├── PlayerInputMessage.java       # Input event DTO
@@ -131,7 +139,7 @@ The repository is organized following the multi-module principle:
         ├── java/com/example/server/
         │   ├── ServerApplication.java       # Spring Boot main application class
         │   ├── GameServer.java              # Authoritative game server (@Component, CommandLineRunner)
-        │   ├── GameConstants.java           # Server-side constants (tiles, dimensions, ports)
+        │   ├── GameConstants.java           # Server-side constants (tiles, dimensions, ports, NPCs, powerups)
         │   ├── controller/
         │   │   └── ServerStatusController.java # Spring REST API (/api/status, /api/players)
         │   ├── model/
@@ -139,9 +147,11 @@ The repository is organized following the multi-module principle:
         │   │   ├── ServerPlayer.java        # Server player entity & physics
         │   │   ├── ServerBomb.java          # Server bomb timer & detonation
         │   │   ├── ServerExplosion.java     # Server explosion propagator
+        │   │   ├── ServerNpc.java           # Server NPC entity & wandering AI
+        │   │   ├── ServerPowerup.java       # Server powerup drop & bonuses
         │   │   └── ServerMapFactory.java    # Authoritative map generator
         │   └── network/
-        │       ├── ClientHandler.java       # TCP client socket thread handler
+        │       ├── GameWebSocketHandler.java # WebSocket endpoint (/ws/game) dispatcher
         │       ├── GameMessage.java          # Server network message base
         │       ├── PlayerJoinMessage.java    # Join request DTO
         │       ├── PlayerInputMessage.java   # Input event DTO
