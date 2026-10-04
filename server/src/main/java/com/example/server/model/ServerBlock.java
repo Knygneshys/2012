@@ -67,14 +67,4 @@ public abstract class ServerBlock extends ServerGameObject {
         return tileType;
     }
 
-    /**
-     * Builds the block that represents the given tile type.
-     */
-    public static ServerBlock create(int x, int y, TileType tileType) {
-        return switch (tileType) {
-            case HARD_WALL -> new ServerWall(x, y);
-            case SOFT_BLOCK -> new ServerBreakableWall(x, y);
-            case FLOOR -> new ServerPassage(x, y);
-        };
-    }
 }
