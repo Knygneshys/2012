@@ -1,4 +1,6 @@
-package com.example.server.model;
+package com.example.server.model.blocks;
+
+import com.example.server.model.TileType;
 
 /**
  * Empty walkable ground: never blocked, never destroyed, and what a

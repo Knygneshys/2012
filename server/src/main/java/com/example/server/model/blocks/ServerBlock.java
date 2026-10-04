@@ -1,4 +1,7 @@
-package com.example.server.model;
+package com.example.server.model.blocks;
+
+import com.example.server.model.ServerGameObject;
+import com.example.server.model.TileType;
 
 /**
  * A single tile of the authoritative playfield.

@@ -1,4 +1,6 @@
-package com.example.server.model;
+package com.example.server.model.blocks;
+
+import com.example.server.model.TileType;
 
 /**
  * A destructible block. A blast consumes it, leaving a {@link ServerPassage},

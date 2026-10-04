@@ -1,5 +1,11 @@
 package com.example.server.model;
 
+import com.example.server.model.blocks.ServerBlock;
+import com.example.server.model.factories.BreakableWallFactory;
+import com.example.server.model.factories.PassageFactory;
+import com.example.server.model.factories.ServerBlockFactory;
+import com.example.server.model.factories.WallFactory;
+
 import com.example.server.GameConstants;
 import java.util.Map;
 import java.util.Random;

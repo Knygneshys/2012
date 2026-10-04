@@ -1,4 +1,6 @@
-package com.example.server.model;
+package com.example.server.model.factories;
+
+import com.example.server.model.blocks.ServerBlock;
 
 /**
  * Places tiles using a Factory Method implemented by each concrete creator.
