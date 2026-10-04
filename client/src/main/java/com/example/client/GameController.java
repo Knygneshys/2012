@@ -5,6 +5,9 @@ import com.example.client.network.GameStateMessage;
 import com.example.client.network.GameStateData;
 import java.awt.event.KeyEvent;
 import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.SwingUtilities;
 
 public class GameController {
     private final Player player;
@@ -37,11 +40,15 @@ public class GameController {
     }
 
     /**
-     * Called when the server sends a game state update.
+     * Called when the server sends a game state update. It arrives on the socket
+     * thread, so the panel and player models are updated on the event dispatch
+     * thread that also paints them.
      */
     private void onGameStateUpdate(GameStateMessage msg) {
-        GameStateData state = msg.gameState;
+        SwingUtilities.invokeLater(() -> applyGameState(msg.gameState));
+    }
 
+    private void applyGameState(GameStateData state) {
         // Convert map from int array back to TileType
         TileType[][] map = new TileType[state.map.length][state.map[0].length];
         for (int y = 0; y < state.map.length; y++) {
@@ -54,6 +61,7 @@ public class GameController {
         for (GameStateData.PlayerData pd : state.players) {
             if (pd.playerId == networkClient.getPlayerId()) {
                 // Update our local player
+                player.id = pd.playerId;
                 player.position = new GameObject.Position(pd.x, pd.y);
                 player.alive = pd.alive;
                 player.moveSpeed = pd.moveSpeed;
@@ -70,20 +78,43 @@ public class GameController {
         }
 
         // Update map and explosions
-        java.util.List<int[][]> explosionTiles = new java.util.ArrayList<>();
+        List<int[][]> explosionTiles = new ArrayList<>();
         for (GameStateData.ExplosionData ed : state.explosions) {
             explosionTiles.add(ed.tiles);
         }
 
         // Convert bombs to tile coordinates
-        java.util.List<int[]> bombTiles = new java.util.ArrayList<>();
+        List<int[]> bombTiles = new ArrayList<>();
         for (GameStateData.BombData bd : state.bombs) {
             bombTiles.add(new int[]{bd.tileX, bd.tileY});
         }
 
         mapPanel.updateGameState(map, explosionTiles, bombTiles);
+        mapPanel.updateNpcs(buildNpcs(state.npcs));
+        mapPanel.updatePowerups(buildPowerups(state.powerups));
 
         mapPanel.repaint();
+    }
+
+    private List<NPC> buildNpcs(List<GameStateData.NpcData> data) {
+        List<NPC> npcList = new ArrayList<>();
+        for (GameStateData.NpcData nd : data) {
+            // alive and moveSpeed come from the server, the client never
+            // decides them itself
+            npcList.add(new NPC(nd.npcId, "NPC " + nd.npcId, nd.x, nd.y,
+                    nd.moveSpeed, hexToColor(nd.colorHex),
+                    MapPanel.TILE_SIZE, MapPanel.TILE_SIZE, nd.alive));
+        }
+        return npcList;
+    }
+
+    private List<Powerup> buildPowerups(List<GameStateData.PowerupData> data) {
+        List<Powerup> powerupList = new ArrayList<>();
+        for (GameStateData.PowerupData pd : data) {
+            powerupList.add(new Powerup(Powerup.Kind.fromOrdinal(pd.kind),
+                    pd.tileX, pd.tileY, MapPanel.TILE_SIZE));
+        }
+        return powerupList;
     }
 
     private Color hexToColor(String hex) {
