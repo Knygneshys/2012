@@ -1,5 +1,6 @@
 package com.example.server.network;
 
+import com.example.server.GameLogger;
 import com.example.server.GameServer;
 import com.google.gson.Gson;
 import org.springframework.context.annotation.Lazy;
@@ -12,6 +13,8 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 @Component
 public class GameWebSocketHandler extends TextWebSocketHandler {
 
+    private static final GameLogger log = GameLogger.getInstance();
+
     private final GameServer gameServer;
     private final Gson gson = new Gson();
 
@@ -21,7 +24,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        System.out.println("[Server] WebSocket connection established from " + session.getRemoteAddress() + " (session " + session.getId() + ")");
+        log.info("WebSocket connection established from " + session.getRemoteAddress() + " (session " + session.getId() + ")");
     }
 
     @Override
@@ -36,7 +39,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 gameServer.handlePlayerInput(session, msg);
             }
         } catch (Exception e) {
-            System.err.println("[Server] Error handling WebSocket message: " + e.getMessage());
+            log.error("Error handling WebSocket message", e);
         }
     }
 
@@ -47,7 +50,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
-        System.err.println("[Server] Transport error for session " + session.getId() + ": " + exception.getMessage());
+        log.error("Transport error for session " + session.getId(), exception);
         gameServer.handleSessionClosed(session);
     }
 }

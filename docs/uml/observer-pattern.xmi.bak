@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Observer pattern, game state fan-out. XMI 2.1 / UML 2.1.
+  Import: MagicDraw  File > Import > XMI...  (also Visual Paradigm, Enterprise
+  Architect, StarUML, ArgoUML, Eclipse Papyrus).
+  After importing, create a Class Diagram on the model root and drag the
+  com.example.client package into it.
+-->
+<xmi:XMI xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+        xmlns:uml="http://schema.omg.org/spec/UML/2.1"
+        xmi:version="2.1">
+
+  <uml:Model xmi:id="model_observer" name="Observer_GameStateFanOut">
+
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_int" name="int"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_String" name="String"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_boolean" name="boolean"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_void" name="void"/>
+
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_java_lang" name="java.lang">
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_Object" name="Object"/>
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_Integer" name="Integer"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_client" name="com.example.client">
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_GameStateData" name="GameStateData"/>
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_ClientGameState" name="ClientGameState">
+        <ownedAttribute xmi:id="at_st_map" name="map" visibility="public">
+          <type href="#cls_Object"/>
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="lv_map_lo" value="0"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="lv_map_hi" value="-1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_st_bombs" name="serverBombs" visibility="public">
+          <type href="#cls_Object"/>
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="lv_b_lo" value="0"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="lv_b_hi" value="-1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_st_expl" name="explosionTiles" visibility="public">
+          <type href="#cls_Object"/>
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="lv_e_lo" value="0"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="lv_e_hi" value="-1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_st_players" name="players" visibility="public">
+          <type href="#cls_Object"/>
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="lv_p_lo" value="0"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="lv_p_hi" value="-1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_st_npcs" name="npcs" visibility="public">
+          <type href="#cls_Object"/>
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="lv_n_lo" value="0"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="lv_n_hi" value="-1"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_st_power" name="powerups" visibility="public">
+          <type href="#cls_Object"/>
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="lv_pu_lo" value="0"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="lv_pu_hi" value="-1"/>
+        </ownedAttribute>
+      </packagedElement>
+
+      <!-- SUBJECT -->
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_GameStateSubject" name="GameStateSubject">
+        <ownedOperation xmi:id="op_sub_subscribe" name="subscribe" visibility="public">
+          <ownedParameter xmi:id="prm_su_o" name="observer" kind="in">
+            <type href="#cls_GameStateObserver"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_su_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+        <ownedOperation xmi:id="op_sub_unsub" name="unsubscribe" visibility="public">
+          <ownedParameter xmi:id="prm_un_o" name="observer" kind="in">
+            <type href="#cls_GameStateObserver"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_un_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+        <ownedOperation xmi:id="op_sub_count" name="observerCount" visibility="public">
+          <ownedParameter xmi:id="prm_c_ret" name="" kind="return">
+            <type href="#prim_int"/>
+          </ownedParameter>
+        </ownedOperation>
+        <ownedOperation xmi:id="op_sub_publish" name="publish" visibility="public">
+          <ownedParameter xmi:id="prm_pb_d" name="data" kind="in">
+            <type href="#cls_GameStateData"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_pb_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+        <ownedOperation xmi:id="op_sub_translate" name="translate" visibility="private">
+          <ownedParameter xmi:id="prm_tr_d" name="data" kind="in">
+            <type href="#cls_GameStateData"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_tr_ret" name="" kind="return">
+            <type href="#cls_ClientGameState"/>
+          </ownedParameter>
+        </ownedOperation>
+
+        <!-- Open diamond: the subject holds observers but does not own their life. -->
+        <ownedMember xmi:type="uml:Property" xmi:id="prop_observers" name="observers"
+                     visibility="private" aggregation="aggregate"
+                     type="cls_GameStateObserver">
+          <lowerValue xmi:type="uml:LiteralInteger" xmi:id="lv_obs_lo" value="0"/>
+          <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="lv_obs_hi" value="-1"/>
+        </ownedMember>
+      </packagedElement>
+
+      <!-- OBSERVER -->
+      <packagedElement xmi:type="uml:Interface" xmi:id="cls_GameStateObserver"
+                       name="GameStateObserver" isAbstract="true">
+        <ownedOperation xmi:id="op_obs_state" name="onGameState" isAbstract="true"
+                       visibility="public">
+          <ownedParameter xmi:id="prm_og_s" name="state" kind="in">
+            <type href="#cls_ClientGameState"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_og_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+        <ownedOperation xmi:id="op_obs_name" name="name" visibility="public"
+                       isQuery="true" concurrency="concurrent">
+          <ownedParameter xmi:id="prm_nm_ret" name="" kind="return">
+            <type href="#prim_String"/>
+          </ownedParameter>
+        </ownedOperation>
+      </packagedElement>
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_MapPanel" name="MapPanel"/>
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_Player" name="Player"/>
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_NetworkClient" name="NetworkClient"/>
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_GameStateMessage" name="GameStateMessage"/>
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_GameController" name="GameController">
+        <ownedOperation xmi:id="op_gc_update" name="onGameStateUpdate" visibility="private">
+          <ownedParameter xmi:id="prm_gc_m" name="msg" kind="in">
+            <type href="#cls_GameStateMessage"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_gc_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+
+        <ownedMember xmi:type="uml:Property" xmi:id="prop_subject" name="gameState"
+                     visibility="private" type="cls_GameStateSubject"/>
+      </packagedElement>
+
+      <packagedElement xmi:type="uml:Package" xmi:id="pkg_observers"
+                       name="com.example.client.observer">
+
+        <packagedElement xmi:type="uml:Class" xmi:id="cls_MapStateObserver"
+                         name="MapStateObserver">
+          <ownedMember xmi:type="uml:Property" xmi:id="prop_map_panel" name="mapPanel"
+                       visibility="private" type="cls_MapPanel"/>
+          <generalization xmi:id="real_Map" general="#cls_GameStateObserver"
+                          specific="#cls_MapStateObserver"/>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="cls_NpcStateObserver" name="NpcStateObserver">
+          <ownedMember xmi:type="uml:Property" xmi:id="prop_npc_panel" name="mapPanel"
+                       visibility="private" type="cls_MapPanel"/>
+          <generalization xmi:id="real_Npc" general="#cls_GameStateObserver"
+                          specific="#cls_NpcStateObserver"/>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="cls_PowerupStateObserver"
+                         name="PowerupStateObserver">
+          <ownedMember xmi:type="uml:Property" xmi:id="prop_pw_panel" name="mapPanel"
+                       visibility="private" type="cls_MapPanel"/>
+          <generalization xmi:id="real_Powerup" general="#cls_GameStateObserver"
+                          specific="#cls_PowerupStateObserver"/>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="cls_PlayerStateObserver"
+                         name="PlayerStateObserver">
+          <ownedMember xmi:type="uml:Property" xmi:id="prop_pl_player" name="player"
+                       visibility="private" type="cls_Player"/>
+          <ownedMember xmi:type="uml:Property" xmi:id="prop_pl_panel" name="mapPanel"
+                       visibility="private" type="cls_MapPanel"/>
+          <generalization xmi:id="real_Player" general="#cls_GameStateObserver"
+                          specific="#cls_PlayerStateObserver"/>
+        </packagedElement>
+      </packagedElement>
+
+      <!-- Subject builds the snapshot once, then hands the same one to everyone. -->
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_translate" name="builds"
+                   source="#cls_GameStateSubject" target="#cls_ClientGameState"/>
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_param" name="receives"
+                   source="#cls_GameStateObserver" target="#cls_ClientGameState"/>
+
+      <!-- Composition root: builds the subject and subscribes the concrete observers. -->
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_root" name="creates and subscribes"
+                   source="#cls_GameController" target="#cls_GameStateSubject"/>
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_net" name="notifies"
+                   source="#cls_NetworkClient" target="#cls_GameController"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_diagram" name="ObserverDiagram">
+      <ownedElement xmi:id="dia_observer" name="Observer - game state fan-out"
+                    type="uml:ClassDiagram">
+        <ownedElement xmi:type="uml:Package" xmi:id="ref_pkg_client" name="com.example.client"
+                      source="#pkg_client"/>
+      </ownedElement>
+    </packagedElement>
+
+  </uml:Model>
+</xmi:XMI>

@@ -142,16 +142,26 @@ Package: com.example.client
 ├── TileType (enum)
 ├── DemoMapFactory (map generation)
 ├── MapPanel (JPanel - rendering)
-├── GameController (input handling)
+├── GameController (key input; composition root for the update path)
+├── GameStateSubject (Observer subject - holds observers, fans out updates)
+├── GameStateObserver (Observer interface, one method + default name)
+├── ClientGameState (immutable snapshot of one broadcast)
+├── observer package
+│   ├── MapStateObserver (terrain, explosions, server bombs)
+│   ├── NpcStateObserver (drawn NPCs)
+│   ├── PowerupStateObserver (visible powerups)
+│   └── PlayerStateObserver (local + remote players)
+├── GameLogger (Singleton - one log instance per JVM, static initialization)
 ├── App (single-player main)
 └── MultiplayerApp (multiplayer main)
 
 Package: com.example.server
+├── GameLogger (Singleton - one log instance per JVM, static initialization)
 └── GameServer
     └── ServerGameObject (shared tile anchor)
         ├── ServerCharacter (position, speed, alive, the movement rule)
         │   ├── ServerPlayer (authoritative player)
-        │   └── ServerNpc (authoritative NPC, wandering AI)
+        │   └── ServerNpc (authoritative NPC, holds one NpcStrategy)
         ├── ServerBlock (a tile of the map)
         │   ├── ServerWall (impassable, survives and stops blasts)
         │   ├── ServerBreakableWall (impassable, a blast turns it into a Passage)
@@ -159,11 +169,22 @@ Package: com.example.server
         ├── ServerBomb (authoritative bomb)
         └── ServerPowerup (authoritative powerup drop)
 
+Package: com.example.server.model.ai
+├── NpcStrategy (Strategy interface - chooseStep, plus DIRECTIONS and HOLD)
+├── NpcContext (record - deltaMs, own tile, target tile, random)
+├── NpcBehaviour (enum - the catalogue and the factory that builds strategies)
+├── WanderStrategy (hold a heading, turn occasionally)
+├── PatrolStrategy (walk back and forth along one axis)
+├── ChaseStrategy (close on the nearest living player)
+├── CowardStrategy (open the distance from it)
+└── SentinelStrategy (never move)
+
 Package: com.example.client.network
 └── NetworkClient
     ├── Connection management
     ├── Message sending
-    └── Callback-based updates
+    └── Callback-based updates (hand each GAME_STATE to GameController, which
+        publishes it to GameStateSubject for the observers to fan out)
 
 Package: com.example.network
 ├── GameMessage (abstract)
@@ -199,6 +220,139 @@ constants at each call site. What differs is why:
 
 `TileType` stays the wire format on both sides, so its ordinal order is part of
 the protocol and must not change.
+
+## Instance-Control Pattern
+
+`GameLogger` is a **Singleton**: one instance per JVM, reached through
+`getInstance()`, built by static initialization. It is a stateless facade over
+the output stream, so it qualifies — the `[Server]` / `[Client]` prefix lives in
+one place instead of 28 call sites, and the game loop, the WebSocket handler
+threads and the event dispatch thread all write through the same handle without
+interleaving half-written lines. Static initialization is the variant used
+because the JVM serialises class loading, which makes it thread safe with none
+of the locking that the lazy variants need.
+
+Two things deliberately stay away from the pattern. `GameServer` is already a
+Spring `@Component`, so the container guarantees one instance per context and
+owns its lifecycle; a static accessor on top of that would give two competing
+owners and hide the circular dependency `GameWebSocketHandler` currently has to
+break with `@Lazy`. And `Random` is not shared, since one global instance would
+serialise every thread that draws from it and make rounds impossible to
+reproduce in a test.
+
+## Strategy — NPC Behaviour
+
+An NPC decides *which way to step* through an `NpcStrategy` it **has**,
+rather than being one subclass per behaviour. Before, `ServerNpc.tick()` carried
+the wander algorithm inline; now that algorithm is one strategy among five and
+is interchangeable at runtime.
+
+```
+                    ┌──────────────────────────┐
+                    │  ServerNpc  (context)    │
+                    │  has-a NpcStrategy       │
+                    └────────────┬─────────────┘
+                                 │ delegates intent only
+                    ┌────────────▼─────────────┐
+                    │      NpcStrategy         │  ← interface
+                    │  int chooseStep(ctx)     │
+                    │  int[][] DIRECTIONS      │
+                    │  int HOLD = -1           │
+                    └────────────┬─────────────┘
+        ┌──────────┬────────────┼────────────┬──────────────┐
+        ▼          ▼            ▼            ▼              ▼
+   Wander     Patrol        Chase        Coward        Sentinel
+   Strategy   Strategy     Strategy     Strategy      Strategy
+```
+
+Five concrete strategies, built by the `NpcBehaviour` enum acting as the
+factory. `NpcBehaviour.forIndex(i)` deals them out at spawn, so a round gets a
+mix of personalities instead of three identical enemies.
+
+The split of responsibility matters. A strategy answers *intent only* — which of
+the four directions it wants — and is given a `NpcContext` carrying no map and no
+player list. Whether that step is possible is answered by `ServerNpc`, using the
+same `ServerCharacter.move` collision rule every character obeys, retrying
+sideways when blocked. So no strategy can get itself stuck, and none can quietly
+disagree with the map about what is solid.
+
+**Who changes the strategy?** Neither the NPC nor the strategy. The server
+decides at spawn time, and at runtime `NpcBehaviour.fallbackWithoutTarget()`
+covers the rest: a behaviour that needs a player to react to declares what it
+becomes when the lobby empties, so a `Chaser` drops to `Wanderer` rather than
+hunting an empty map. `ServerNpc.setBehaviour(...)` allows a direct swap too.
+
+## Observer — Game State Fan-Out
+
+The client used to handle a server update in one fifty-line method
+(`GameController.applyGameState`) that re-parsed the tile grid, rebuilt the NPC
+and powerup lists and split players into local and remote — all because it was
+the single listener the network layer allowed. That is the dependency pile-up
+the pattern removes.
+
+`GameStateSubject` is the subject. It translates the wire update into one
+immutable `ClientGameState`, then hands that same snapshot to every registered
+observer. Four observers each own one slice and know nothing about the others.
+
+### Sequence Diagram
+
+```
+ Client          NetworkClient      GameController     GameStateSubject              Observers
+   │                  │                   │                   │                        │
+   │                  │                   │                   │                        │
+   │              GAME_STATE               │                   │                        │
+   │ ────────────────►│                   │                   │                        │
+   │                  │                   │                   │                        │
+   │                  │ onGameStateUpdate │                   │                        │
+   │                  │ ─────────────────►│                   │                        │
+   │                  │                   │                   │                        │
+   │        [ socket thread ]             │                   │                        │
+   │                  │                   │ invokeLater       │                        │
+   │                  │                   │ ──┐               │                        │
+   │                  │                   │   │ [ event dispatch thread ]               │
+   │                  │                   │ ◄─┘               │                        │
+   │                  │                   │                   │                        │
+   │                  │                   │  publish(state)   │                        │
+   │                  │                   │ ─────────────────►│                        │
+   │                  │                   │                   │                        │
+   │                  │                   │        translate once → ClientGameState    │
+   │                  │                   │                   │                        │
+   │                  │                   │   ┌───────────────────────────────────────┐ │
+   │                  │                   │   │ for each observer:                    │ │
+   │                  │                   │   │   onGameState(snapshot)               │ │
+   │                  │                   │   └───────────────────────────────────────┘ │
+   │                  │                   │                   │                        │
+   │                  │                   │                   ├──► MapStateObserver     │
+   │                  │                   │                   │      updateGameState()  │
+   │                  │                   │                   │      repaint()          │
+   │                  │                   │                   │                        │
+   │                  │                   │                   ├──► NpcStateObserver     │
+   │                  │                   │                   │      updateNpcs()       │
+   │                  │                   │                   │                        │
+   │                  │                   │                   ├──► PowerupStateObserver │
+   │                  │                   │                   │      updatePowerups()   │
+   │                  │                   │                   │                        │
+   │                  │                   │                   ├──► PlayerStateObserver  │
+   │                  │                   │                   │      local player set  │
+   │                  │                   │                   │      remotes added/updated
+   │                  │                   │                   │                        │
+```
+
+Reading the diagram: the update crosses **two** thread boundaries, and both are
+deliberate. `NetworkClient` parses on the socket thread, so the subject is
+published on the event dispatch thread via `invokeLater` — that is what lets the
+observers touch Swing components directly with no further marshalling. The
+subject does not know what any observer does with the update; it only knows how
+to build a snapshot and hand it out.
+
+Subscribers are held in a `CopyOnWriteArrayList`, because a window may
+unsubscribe on the event dispatch thread while the next update is being fanned
+out. Copying on write keeps iteration lock-free, which matters at ten broadcasts
+a second.
+
+Adding a fifth observer is one `subscribe` line in `GameController` — which is
+the only class that names them, since it is the composition root — and one new
+class. Nothing in the subject, the snapshot or the existing observers changes.
 
 ## Data Flow Diagram
 
@@ -341,19 +495,24 @@ CLIENT JOIN SEQUENCE:
 GAMEPLAY SEQUENCE (EVERY 100ms):
 1. Server: gameLoop() tick
 2. Server: updateGameState()
+   - Move NPCs: each asks its NpcStrategy which way it wants to step
    - Update bomb fuses
    - Check bomb detonation
    - Update explosions
 3. Server: broadcastGameState()
    - createGameStateData() (convert to JSON)
    - sendMessage() to all connected clients
-4. Client: GameStateMessage received
+4. Client: GameStateMessage received on the socket thread
 5. Client: onGameStateUpdate() called
-   - Update player positions
-   - Update map
-   - Update bombs, explosions
-   - Call mapPanel.updateGameState()
-6. Client: MapPanel.repaint()
+   - invokeLater() hops to the event dispatch thread
+6. Client: GameStateSubject.publish() on the event dispatch thread
+   - Translate once into an immutable ClientGameState
+   - Fan out to every registered observer:
+     - MapStateObserver     -> mapPanel.updateGameState(map, explosions, bombs)
+     - NpcStateObserver     -> mapPanel.updateNpcs(npcs)
+     - PowerupStateObserver -> mapPanel.updatePowerups(powerups)
+     - PlayerStateObserver  -> local player set, remotes added/updated
+7. Client: MapPanel.repaint()
    - paintComponent() called at 60 FPS (Swing timer)
    - All objects rendered
 
