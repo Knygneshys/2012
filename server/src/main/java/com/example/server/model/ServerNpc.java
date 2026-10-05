@@ -3,6 +3,7 @@ package com.example.server.model;
 import com.example.server.model.ai.NpcBehaviour;
 import com.example.server.model.ai.NpcContext;
 import com.example.server.model.ai.NpcStrategy;
+import com.example.server.model.blocks.ServerBlock;
 
 import java.util.Random;
 

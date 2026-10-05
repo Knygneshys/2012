@@ -1,9 +1,22 @@
 package com.example.server.model;
 
+import com.example.server.model.blocks.ServerBlock;
+import com.example.server.model.factories.BreakableWallFactory;
+import com.example.server.model.factories.PassageFactory;
+import com.example.server.model.factories.ServerBlockFactory;
+import com.example.server.model.factories.WallFactory;
+
 import com.example.server.GameConstants;
+import java.util.Map;
 import java.util.Random;
 
 public final class ServerMapFactory {
+    private static final Map<TileType, ServerBlockFactory> FACTORIES = Map.of(
+            TileType.HARD_WALL, new WallFactory(),
+            TileType.SOFT_BLOCK, new BreakableWallFactory(),
+            TileType.FLOOR, new PassageFactory()
+    );
+
     private ServerMapFactory() {}
 
     public static ServerBlock[][] createDefaultMap() {
@@ -12,7 +25,7 @@ public final class ServerMapFactory {
 
         for (int y = 0; y < layout.length; y++) {
             for (int x = 0; x < layout[0].length; x++) {
-                map[y][x] = ServerBlock.create(x, y, layout[y][x]);
+                FACTORIES.get(layout[y][x]).placeBlock(map, x, y);
             }
         }
         return map;

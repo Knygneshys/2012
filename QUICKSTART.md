@@ -18,6 +18,18 @@ cd 2012-bomberman
 
 ## Playing Locally (Same Machine)
 
+On macOS, open the server and two clients in separate Terminal windows:
+
+```bash
+./run-local-mac.sh
+```
+
+Wait for the server to finish starting, then enter a different player name in
+each client's dialog and click **Connect** (localhost, port 8080). Stop each
+process with **Ctrl+C** in its Terminal window.
+
+Or launch each process manually:
+
 ```bash
 # Terminal 1 - Start Server
 ./run-server.sh
@@ -192,4 +204,3 @@ mvn clean package
 **Version**: Bomberman Multiplayer Edition  
 **Java**: 17+  
 **Last Updated**: 2024
-

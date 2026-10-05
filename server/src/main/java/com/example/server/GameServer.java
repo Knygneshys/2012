@@ -1,7 +1,7 @@
 package com.example.server;
 
 import com.example.server.model.ServerBomb;
-import com.example.server.model.ServerBlock;
+import com.example.server.model.blocks.ServerBlock;
 import com.example.server.model.ServerExplosion;
 import com.example.server.model.ServerMapFactory;
 import com.example.server.model.ServerNpc;
