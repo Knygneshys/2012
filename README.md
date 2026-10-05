@@ -44,22 +44,22 @@ mvn clean package -DskipTests
 #### On Linux / macOS:
 ```bash
 chmod +x run-server.sh
-./run-server.sh 9876
+./run-server.sh 8080
 ```
 
 #### On Windows:
 ```cmd
-run-server.bat 9876
+run-server.bat 8080
 ```
 
 #### Or using Maven directly:
 ```bash
 cd server
-mvn spring-boot:run -Dspring-boot.run.arguments="9876"
+mvn spring-boot:run -Dspring-boot.run.arguments="8080"
 ```
 
 The Spring Boot server will start:
-- **TCP Game Socket**: `localhost:9876` (handles real-time game traffic)
+- **TCP Game Socket**: `localhost:8080` (handles real-time game traffic)
 - **HTTP REST API**: `http://localhost:8080/api/status` (status and player count)
 
 ### 3. Launch Client(s) (Java Swing)
@@ -69,18 +69,18 @@ In a new terminal window for each player (2-4 players):
 #### On Linux / macOS:
 ```bash
 chmod +x run-client.sh
-./run-client.sh localhost 9876
+./run-client.sh localhost 8080
 ```
 
 #### On Windows:
 ```cmd
-run-client.bat localhost 9876
+run-client.bat localhost 8080
 ```
 
 #### Or using Maven directly:
 ```bash
 cd client
-mvn exec:java -Dexec.args="localhost 9876"
+mvn exec:java -Dexec.args="localhost 8080"
 ```
 
 Enter your player name in the connection dialog and click **Connect**.
@@ -167,3 +167,21 @@ The repository is organized following the multi-module principle:
 - `client` and `server` have separate `pom.xml` configurations.
 - Neither module imports or depends on classes from the other module.
 - All coordination is performed strictly over the network using TCP sockets and JSON payloads.
+
+### Tile Factory Method
+
+Server map generation uses `ServerBlockFactory.placeBlock(...)`, which calls
+the overridable `createBlock(...)` factory method. `WallFactory`,
+`BreakableWallFactory`, and `PassageFactory` each create their corresponding
+`ServerBlock` subclass. `ServerMapFactory` selects the creator by `TileType`;
+the tile layout and network format stay the same.
+
+Run the dependency-free factory checks from the project root:
+
+```bash
+mvn test-compile
+java -cp server/target/classes:server/target/test-classes com.example.server.model.ServerBlockFactoryCheck
+```
+
+On Windows, use `;` instead of `:` between the two classpath directories.
+This executable check must be run explicitly; it is not a JUnit test.
