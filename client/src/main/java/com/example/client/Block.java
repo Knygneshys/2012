@@ -1,6 +1,7 @@
 package com.example.client;
 
 import java.awt.Color;
+import com.example.client.factories.MapElementFactory;
 
 /**
  * A single tile of the playfield.
@@ -68,24 +69,25 @@ public abstract class Block extends GameObject {
     /**
      * Builds the block that represents the given tile type.
      */
-    public static Block create(int tileX, int tileY, TileType tileType, int tileSize) {
+    public static Block create(int tileX, int tileY, TileType tileType, int tileSize, MapElementFactory factory) {
         return switch (tileType) {
-            case HARD_WALL -> new Wall(tileX, tileY, tileSize);
-            case SOFT_BLOCK -> new BreakableWall(tileX, tileY, tileSize);
-            case FLOOR -> new Passage(tileX, tileY, tileSize);
+            case HARD_WALL -> factory.createWall(tileX, tileY, tileSize);
+            case SOFT_BLOCK -> factory.createBreakableWall(tileX, tileY, tileSize);
+            case FLOOR -> factory.createPassage(tileX, tileY, tileSize);
         };
     }
 
     /**
      * Converts a tile map into the block objects used by rendering and collision.
      */
-    public static Block[][] fromMap(TileType[][] map, int tileSize) {
+    public static Block[][] fromMap(TileType[][] map, int tileSize, MapElementFactory factory) {
         Block[][] blocks = new Block[map.length][map[0].length];
         for (int y = 0; y < map.length; y++) {
             for (int x = 0; x < map[0].length; x++) {
-                blocks[y][x] = create(x, y, map[y][x], tileSize);
+                blocks[y][x] = create(x, y, map[y][x], tileSize, factory);
             }
         }
+
         return blocks;
     }
 }
