@@ -16,8 +16,12 @@ import java.util.HashMap;
 import java.util.Set;
 import javax.swing.JPanel;
 import javax.swing.Timer;
+import com.example.client.factories.MapElementFactory;
+import com.example.client.factories.ClassicMapElementFactory;
+import com.example.client.factories.IceMapElementFactory;
 
 public class MapPanel extends JPanel {
+    private final MapElementFactory mapElementFactory;
     public static final int TILE_SIZE = 40;
     private static final Color GRID_COLOR = new Color(30, 30, 30);
 
@@ -40,6 +44,7 @@ public class MapPanel extends JPanel {
 
     public MapPanel(TileType[][] map, Player player) {
         this.player = player;
+        this.mapElementFactory = new IceMapElementFactory();
         setMap(map);
         setPreferredSize(new Dimension(
                 DemoMapFactory.MAP_WIDTH * TILE_SIZE,
@@ -59,7 +64,7 @@ public class MapPanel extends JPanel {
      */
     private void setMap(TileType[][] map) {
         this.map = map;
-        this.blocks = Block.fromMap(map, TILE_SIZE);
+        this.blocks = Block.fromMap(map, TILE_SIZE, mapElementFactory);
     }
 
     public TileType[][] getMap() {
