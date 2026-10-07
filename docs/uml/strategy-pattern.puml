@@ -1,0 +1,63 @@
+@startuml
+title Strategy — NPC behaviour (server)
+
+interface NpcStrategy {
+  +int HOLD = -1
+  +int NO_BLOCK = -2
+  +int[][] DIRECTIONS
+  +int chooseStep(ctx : NpcContext) : int
+  +String description() : String
+}
+
+class "NpcContext" <<record>> {
+  +int deltaMs
+  +int tileX, tileY
+  +int targetTileX, targetTileY
+  +Random random
+  +int blockedDirection
+  +isBlocked(dir : int) : boolean
+}
+
+abstract class ServerCharacter {
+  +int id, x, y, moveSpeed
+  +boolean alive
+  +move(dx, dy, map) : boolean
+}
+
+class ServerNpc {
+  -NpcStrategy strategy
+  -NpcBehaviour behaviour
+  -int lastBlocked
+  -int stuckTicks
+  +tick(deltaMs, map, target) : void
+  +setBehaviour(b : NpcBehaviour) : void
+}
+
+enum NpcBehaviour {
+  WANDERER
+  PATROLLER
+  CHASER
+  COWARD
+  SENTINEL
+  +create(random) : NpcStrategy
+  +fallbackWhenStuck() : NpcBehaviour
+  +fallbackWithoutTarget() : NpcBehaviour
+}
+
+class WanderStrategy
+class PatrolStrategy
+class ChaseStrategy
+class CowardStrategy
+class SentinelStrategy
+
+ServerCharacter <|-- ServerNpc
+ServerNpc "1" *-- "1" NpcStrategy : strategy >
+NpcStrategy ..> NpcContext : parameter object
+NpcBehaviour ..> NpcStrategy : creates (factory)
+
+NpcStrategy <|.. WanderStrategy
+NpcStrategy <|.. PatrolStrategy
+NpcStrategy <|.. ChaseStrategy
+NpcStrategy <|.. CowardStrategy
+NpcStrategy <|.. SentinelStrategy
+@enduml

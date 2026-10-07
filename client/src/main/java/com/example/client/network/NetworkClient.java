@@ -1,5 +1,6 @@
 package com.example.client.network;
 
+import com.example.client.GameLogger;
 import com.google.gson.Gson;
 
 import java.net.URI;
@@ -16,6 +17,8 @@ import java.util.function.Consumer;
  * Uses Java's standard java.net.http.WebSocket.
  */
 public class NetworkClient {
+    private static final GameLogger log = GameLogger.getInstance();
+
     private final String host;
     private final int port;
     private final String path;
@@ -56,10 +59,10 @@ public class NetworkClient {
 
             this.webSocket = future.get(5, TimeUnit.SECONDS);
             this.connected = true;
-            System.out.println("[Client] Connected to WebSocket at " + wsUri);
+            log.info("Connected to WebSocket at " + wsUri);
             return true;
         } catch (Exception e) {
-            System.err.println("[Client] Failed to connect to WebSocket: " + e.getMessage());
+            log.error("Failed to connect to WebSocket", e);
             this.connected = false;
             return false;
         }
@@ -111,14 +114,14 @@ public class NetworkClient {
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             connected = false;
-            System.out.println("[Client] WebSocket connection closed (" + statusCode + "): " + reason);
+            log.info("WebSocket connection closed (" + statusCode + "): " + reason);
             return null;
         }
 
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
             connected = false;
-            System.err.println("[Client] WebSocket error: " + error.getMessage());
+            log.error("WebSocket error", error);
         }
     }
 
@@ -133,16 +136,16 @@ public class NetworkClient {
                 ServerResponseMessage msg = gson.fromJson(json, ServerResponseMessage.class);
                 if (msg.success && playerId == -1) {
                     playerId = msg.playerId;
-                    System.out.println("[Client] " + msg.message);
+                    log.info(msg.message);
                 } else if (!msg.success) {
-                    System.err.println("[Client] " + msg.message);
+                    log.error(msg.message, null);
                 }
                 if (onServerResponse != null) {
                     onServerResponse.accept(msg);
                 }
             }
         } catch (Exception e) {
-            System.err.println("[Client] Error parsing message: " + e.getMessage());
+            log.error("Error parsing message", e);
         }
     }
 

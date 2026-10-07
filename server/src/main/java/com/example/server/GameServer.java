@@ -7,6 +7,7 @@ import com.example.server.model.ServerMapFactory;
 import com.example.server.model.ServerNpc;
 import com.example.server.model.ServerPlayer;
 import com.example.server.model.ServerPowerup;
+import com.example.server.model.ai.NpcBehaviour;
 import com.example.server.network.GameStateData;
 import com.example.server.network.GameStateMessage;
 import com.example.server.network.PlayerInputMessage;
@@ -31,6 +32,8 @@ import java.util.concurrent.*;
  */
 @Component
 public class GameServer implements CommandLineRunner {
+
+    private static final GameLogger log = GameLogger.getInstance();
 
     @Value("${server.port:8080}")
     private int port = GameConstants.DEFAULT_PORT;
@@ -61,8 +64,8 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
 
     @Override
     public void run(String... args) {
-        System.out.println("[Server] Bomberman Game Server initialized with WebSocket endpoint: ws://localhost:" + port + "/ws/game");
-        System.out.println("[Server] Waiting for players to connect (2-4 players required)...");
+        log.info("Bomberman Game Server initialized with WebSocket endpoint: ws://localhost:" + port + "/ws/game");
+        log.info("Waiting for players to connect (2-4 players required)...");
 
         // Start physics / game update loop. execute(), not submit(): submit()
         // captures a failure in a Future nobody reads, so any exception thrown
@@ -90,8 +93,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
                 break;
             } catch (RuntimeException e) {
                 // One bad tick must not end the game for everyone.
-                System.err.println("[Server] Error in game loop: " + e);
-                e.printStackTrace();
+                log.error("Error in game loop", e);
                 lastUpdateTime = System.currentTimeMillis();
             }
         }
@@ -111,9 +113,10 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         }
 
         // Move NPCs before the fire is applied, so walking into a burning tile cannot
-        // survive until the next tick
+        // survive until the next tick. Each is handed the player it reacts to and
+        // decides for itself what to do about it.
         for (ServerNpc npc : npcs) {
-            npc.tick(deltaMs, map);
+            npc.tick(deltaMs, map, nearestLivingPlayer(npc));
         }
 
         // Update explosions
@@ -184,13 +187,13 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         for (ServerPlayer p : players.values()) {
             if (p.alive && p.overlapsTile(tileX, tileY)) {
                 p.kill();
-                System.out.println("[Server] Player " + p.name + " eliminated!");
+                log.info("Player " + p.name + " eliminated!");
             }
         }
         for (ServerNpc npc : npcs) {
             if (npc.alive && npc.overlapsTile(tileX, tileY)) {
                 npc.kill();
-                System.out.println("[Server] NPC " + npc.id + " eliminated!");
+                log.info("NPC " + npc.id + " eliminated!");
             }
         }
     }
@@ -204,7 +207,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
 
         ServerPowerup powerup = new ServerPowerup(ServerPowerup.Kind.random(random), tileX, tileY);
         powerups.add(powerup);
-        System.out.println("[Server] Dropped " + powerup.kind + " at " + tileX + "," + tileY);
+        log.info("Dropped " + powerup.kind + " at " + tileX + "," + tileY);
     }
 
     /**
@@ -217,7 +220,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             for (ServerPlayer p : players.values()) {
                 if (p.alive && p.overlapsTile(powerup.tileX, powerup.tileY)) {
                     powerup.applyTo(p);
-                    System.out.println("[Server] Player " + p.name + " collected " + powerup.kind);
+                    log.info("Player " + p.name + " collected " + powerup.kind);
                     it.remove();
                     break;
                 }
@@ -234,7 +237,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             for (ServerPlayer p : players.values()) {
                 if (p.alive && npc.overlaps(p)) {
                     p.kill();
-                    System.out.println("[Server] Player " + p.name + " caught by NPC " + npc.id + "!");
+                    log.info("Player " + p.name + " caught by NPC " + npc.id + "!");
                 }
             }
         }
@@ -242,6 +245,9 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
 
     /**
      * Places a fresh NPC on a random free tile, away from the player spawns.
+     * <p>
+     * Personalities are dealt out in catalogue order, so a round always gets a
+     * mix rather than three identical enemies.
      */
     private void spawnNpcs() {
         npcs.clear();
@@ -249,14 +255,38 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             int[] spot = findFreeTile();
             if (spot == null) break;
 
+            NpcBehaviour behaviour = NpcBehaviour.forIndex(i);
             ServerNpc npc = new ServerNpc(i + 1,
                     spot[0] * GameConstants.TILE_SIZE,
                     spot[1] * GameConstants.TILE_SIZE,
                     GameConstants.NPC_MOVE_SPEED,
                     GameConstants.NPC_COLORS[i % GameConstants.NPC_COLORS.length],
-                    random);
+                    behaviour, behaviour.create(random), random);
             npcs.add(npc);
         }
+    }
+
+    /**
+     * The living player an NPC reacts to: whichever is closest right now.
+     * <p>
+     * Reducing the player list to a single target here, rather than handing it
+     * to the NPC, is what keeps the strategies from depending on how players
+     * are stored.
+     */
+    private ServerPlayer nearestLivingPlayer(ServerNpc npc) {
+        ServerPlayer nearest = null;
+        long best = Long.MAX_VALUE;
+        for (ServerPlayer p : players.values()) {
+            if (!p.alive) continue;
+            long dx = (long) p.x - npc.x;
+            long dy = (long) p.y - npc.y;
+            long distance = dx * dx + dy * dy;
+            if (distance < best) {
+                best = distance;
+                nearest = p;
+            }
+        }
+        return nearest;
     }
 
     private int[] findFreeTile() {
@@ -303,7 +333,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
                             session.sendMessage(textMessage);
                         }
                     } catch (IOException e) {
-                        System.err.println("[Server] Error sending state to session " + session.getId() + ": " + e.getMessage());
+                        log.error("Error sending state to session " + session.getId(), e);
                     }
                 }
             }
@@ -378,8 +408,8 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         );
         players.put(playerId, player);
 
-        System.out.println("[Server] Player " + msg.playerName + " joined as Player #" + playerId);
-        System.out.println("[Server] Connected players: " + clientSessions.size() + "/" + GameConstants.MAX_PLAYERS);
+        log.info("Player " + msg.playerName + " joined as Player #" + playerId);
+        log.info("Connected players: " + clientSessions.size() + "/" + GameConstants.MAX_PLAYERS);
 
         ServerResponseMessage response = new ServerResponseMessage(
                 true,
@@ -411,7 +441,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         if (playerId != null) {
             players.remove(playerId);
             clientSessions.remove(playerId);
-            System.out.println("[Server] Player #" + playerId + " disconnected. Connected: " + clientSessions.size());
+            log.info("Player #" + playerId + " disconnected. Connected: " + clientSessions.size());
         }
     }
 
@@ -422,7 +452,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
                     session.sendMessage(new TextMessage(json));
                 }
             } catch (IOException e) {
-                System.err.println("[Server] Error sending message: " + e.getMessage());
+                log.error("Error sending message", e);
             }
         }
     }
@@ -464,7 +494,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         for (ServerPlayer p : players.values()) {
             p.reset();
         }
-        System.out.println("[Server] Game reset!");
+        log.info("Game reset!");
     }
 
     private synchronized int allocatePlayerId() {
@@ -529,7 +559,8 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         try {
             executorService.awaitTermination(3, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Thread.currentThread().interrupt();
+            log.error("Interrupted while waiting for the executor to terminate", e);
         }
     }
 }

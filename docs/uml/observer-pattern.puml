@@ -1,0 +1,50 @@
+@startuml
+title Observer — game state fan-out (client)
+
+interface GameStateObserver {
+  +void onGameState(state : ClientGameState) : void
+  +String name() : String <<default>>
+}
+
+class GameStateSubject {
+  -List<GameStateObserver> observers
+  +subscribe(o : GameStateObserver) : void
+  +unsubscribe(o : GameStateObserver) : void
+  +observerCount() : int
+  +publish(data : GameStateData) : void
+}
+
+class "ClientGameState" <<record>> {
+  +map, serverBombs, explosionTiles
+  +players, npcs, powerups
+}
+
+class MapStateObserver
+class NpcStateObserver
+class PowerupStateObserver
+class PlayerStateObserver
+
+class GameController {
+  +onGameStateUpdate(msg : GameStateMessage) : void
+}
+
+class NetworkClient
+class MapPanel <<JPanel>>
+
+GameController ..> GameStateSubject : creates, subscribes, publishes
+NetworkClient --> GameController : callback
+
+GameStateSubject "1" o-- "0..*" GameStateObserver : observers >
+GameStateSubject ..> ClientGameState : builds once per broadcast
+GameStateObserver ..> ClientGameState : parameter
+
+GameStateObserver <|.. MapStateObserver
+GameStateObserver <|.. NpcStateObserver
+GameStateObserver <|.. PowerupStateObserver
+GameStateObserver <|.. PlayerStateObserver
+
+MapStateObserver ..> MapPanel
+NpcStateObserver ..> MapPanel
+PowerupStateObserver ..> MapPanel
+PlayerStateObserver ..> MapPanel
+@enduml
