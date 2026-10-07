@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Singleton pattern, GameLogger. XMI 2.1 / UML 2.1.
+  Import: MagicDraw  File > Import > XMI...  (also Visual Paradigm, Enterprise
+  Architect, StarUML, ArgoUML, Eclipse Papyrus).
+
+  UML has no "singleton" notation. The pattern is shown by three ordinary marks,
+  which this model already carries:
+    1. the operation getInstance() is static      -> underline it in the diagram
+    2. the constructor GameLogger() is private
+    3. the attribute INSTANCE is static and owned by the class itself
+  Comments attached to each class explain what to draw. There is deliberately no
+  self-association here: a recursive property imports badly in several tools, so
+  add the optional "0..1 instance" self-association by hand if your lecturer
+  wants it.
+-->
+<xmi:XMI xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+        xmlns:uml="http://schema.omg.org/spec/UML/2.1"
+        xmi:version="2.1">
+
+  <uml:Model xmi:id="model_singleton" name="Singleton_GameLogger">
+
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_int" name="int"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_String" name="String"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_boolean" name="boolean"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_void" name="void"/>
+
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_java_io" name="java.io">
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_PrintStream" name="PrintStream"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_java_lang" name="java.lang">
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_Throwable" name="Throwable"/>
+    </packagedElement>
+
+    <!-- ============================ SERVER ============================ -->
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_server"
+                     name="com.example.server">
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_GameLogger" name="GameLogger">
+        <ownedComment xmi:id="cmt_logger" body="SINGLETON. Draw these three marks: (1) getInstance() is underlined because it is static; (2) the constructor is prefixed '-' because it is private, which is what stops anybody building a second instance; (3) INSTANCE is underlined because it is static. No diamond points at this class from anywhere - no caller owns it, it exists because the class loader made it."/>
+
+        <ownedAttribute xmi:id="at_log_INSTANCE" name="INSTANCE" visibility="private"
+                        isStatic="true">
+          <type href="#cls_GameLogger"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_log_prefix" name="prefix" visibility="private">
+          <type href="#prim_String"/>
+        </ownedAttribute>
+
+        <ownedOperation xmi:id="op_log_ctor" name="GameLogger" visibility="private">
+          <ownedParameter xmi:id="prm_ctor_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+
+        <ownedOperation xmi:id="op_log_getInstance" name="getInstance" visibility="public"
+                        isStatic="true">
+          <ownedParameter xmi:id="prm_gi_ret" name="" kind="return">
+            <type href="#cls_GameLogger"/>
+          </ownedParameter>
+        </ownedOperation>
+
+        <ownedOperation xmi:id="op_log_info" name="info" visibility="public">
+          <ownedParameter xmi:id="prm_in_m" name="message" kind="in">
+            <type href="#prim_String"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_in_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+
+        <ownedOperation xmi:id="op_log_error" name="error" visibility="public">
+          <ownedParameter xmi:id="prm_er_m" name="message" kind="in">
+            <type href="#prim_String"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_er_c" name="cause" kind="in">
+            <type href="#cls_Throwable"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_er_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+
+        <ownedOperation xmi:id="op_log_write" name="write" visibility="private"
+                        isStatic="false">
+          <ownedParameter xmi:id="prm_wr_o" name="out" kind="in">
+            <type href="#cls_PrintStream"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_wr_m" name="message" kind="in">
+            <type href="#prim_String"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_wr_c" name="cause" kind="in">
+            <type href="#cls_Throwable"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_wr_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+      </packagedElement>
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_GameServer" name="GameServer">
+        <ownedComment xmi:id="cmt_server" body="Holds one static field: log. Every log call in this class goes through it."/>
+        <ownedAttribute xmi:id="at_gs_log" name="log" visibility="private" isStatic="true">
+          <type href="#cls_GameLogger"/>
+        </ownedAttribute>
+      </packagedElement>
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_WebSocketHandler"
+                       name="GameWebSocketHandler">
+        <ownedComment xmi:id="cmt_handler" body="Holds one static field: log. A second consumer of the same instance, which is the point - one output stream for the whole server."/>
+        <ownedAttribute xmi:id="at_wh_log" name="log" visibility="private" isStatic="true">
+          <type href="#cls_GameLogger"/>
+        </ownedAttribute>
+      </packagedElement>
+
+      <!-- Static access: a dependency, never an association and never a diamond. -->
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_gs_log" name="logs via"
+                   source="#cls_GameServer" target="#cls_GameLogger"/>
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_wh_log" name="logs via"
+                   source="#cls_WebSocketHandler" target="#cls_GameLogger"/>
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_log_stream" name="writes to"
+                   source="#cls_GameLogger" target="#cls_PrintStream"/>
+    </packagedElement>
+
+    <!-- ============================ CLIENT ============================ -->
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_client"
+                     name="com.example.client">
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_ClientGameLogger" name="GameLogger">
+        <ownedComment xmi:id="cmt_clogger" body="A SECOND, SEPARATE GameLogger - this is not duplication. Client and server are separate JVMs, so 'one instance per JVM' means one here and one there. The two modules depend on nothing of each other, which is why the protocol message classes are duplicated the same way."/>
+        <ownedAttribute xmi:id="at_cl_INSTANCE" name="INSTANCE" visibility="private"
+                        isStatic="true">
+          <type href="#cls_ClientGameLogger"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_cl_prefix" name="prefix" visibility="private">
+          <type href="#prim_String"/>
+        </ownedAttribute>
+        <ownedOperation xmi:id="op_cl_ctor" name="GameLogger" visibility="private">
+          <ownedParameter xmi:id="prm_cl_ctor_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+        <ownedOperation xmi:id="op_cl_get" name="getInstance" visibility="public"
+                        isStatic="true">
+          <ownedParameter xmi:id="prm_cl_get_ret" name="" kind="return">
+            <type href="#cls_ClientGameLogger"/>
+          </ownedParameter>
+        </ownedOperation>
+        <ownedOperation xmi:id="op_cl_info" name="info" visibility="public">
+          <ownedParameter xmi:id="prm_cl_in_m" name="message" kind="in">
+            <type href="#prim_String"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_cl_in_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+        <ownedOperation xmi:id="op_cl_error" name="error" visibility="public">
+          <ownedParameter xmi:id="prm_cl_er_m" name="message" kind="in">
+            <type href="#prim_String"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_cl_er_c" name="cause" kind="in">
+            <type href="#cls_Throwable"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_cl_er_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+        <ownedOperation xmi:id="op_cl_write" name="write" visibility="private">
+          <ownedParameter xmi:id="prm_cl_wr_o" name="out" kind="in">
+            <type href="#cls_PrintStream"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_cl_wr_m" name="message" kind="in">
+            <type href="#prim_String"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_cl_wr_c" name="cause" kind="in">
+            <type href="#cls_Throwable"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_cl_wr_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+      </packagedElement>
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_MultiplayerApp" name="MultiplayerApp">
+        <ownedAttribute xmi:id="at_ma_log" name="log" visibility="private" isStatic="true">
+          <type href="#cls_ClientGameLogger"/>
+        </ownedAttribute>
+      </packagedElement>
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_NetworkClient" name="NetworkClient">
+        <ownedAttribute xmi:id="at_nc_log" name="log" visibility="private" isStatic="true">
+          <type href="#cls_ClientGameLogger"/>
+        </ownedAttribute>
+      </packagedElement>
+
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_ma_log" name="logs via"
+                   source="#cls_MultiplayerApp" target="#cls_ClientGameLogger"/>
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_nc_log" name="logs via"
+                   source="#cls_NetworkClient" target="#cls_ClientGameLogger"/>
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_cl_stream" name="writes to"
+                   source="#cls_ClientGameLogger" target="#cls_PrintStream"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_diagram" name="SingletonDiagram">
+      <ownedElement xmi:id="dia_singleton" name="Singleton - GameLogger"
+                    type="uml:ClassDiagram">
+        <ownedElement xmi:type="uml:Package" xmi:id="ref_pkg_server" name="com.example.server"
+                      source="#pkg_server"/>
+        <ownedElement xmi:type="uml:Package" xmi:id="ref_pkg_client" name="com.example.client"
+                      source="#pkg_client"/>
+      </ownedElement>
+    </packagedElement>
+
+  </uml:Model>
+</xmi:XMI>

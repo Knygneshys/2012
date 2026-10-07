@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Strategy pattern, NPC behaviour. XMI 2.1 / UML 2.1.
+  Import: MagicDraw  File > Import > XMI...  (also Visual Paradigm, Enterprise
+  Architect, StarUML, ArgoUML, Eclipse Papyrus).
+  After importing, create a Class Diagram on the model root and drag the
+  com.example.server.model.ai package into it.
+-->
+<xmi:XMI xmlns:xmi="http://schema.omg.org/spec/XMI/2.1"
+        xmlns:uml="http://schema.omg.org/spec/UML/2.1"
+        xmi:version="2.1">
+
+  <uml:Model xmi:id="model_strategy" name="Strategy_NpcBehaviour">
+
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_int" name="int"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_String" name="String"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_boolean" name="boolean"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="prim_void" name="void"/>
+
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_java_util" name="java.util">
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_random" name="Random"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_model" name="com.example.server.model">
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_ServerBlock" name="ServerBlock"/>
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_ServerCharacter" name="ServerCharacter"
+                        isAbstract="true">
+        <ownedAttribute xmi:id="at_sc_id" name="id" visibility="public">
+          <type href="#prim_int"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_sc_x" name="x" visibility="public">
+          <type href="#prim_int"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_sc_y" name="y" visibility="public">
+          <type href="#prim_int"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_sc_speed" name="moveSpeed" visibility="public">
+          <type href="#prim_int"/>
+        </ownedAttribute>
+        <ownedAttribute xmi:id="at_sc_alive" name="alive" visibility="public">
+          <type href="#prim_boolean"/>
+        </ownedAttribute>
+        <ownedOperation xmi:id="op_sc_move" name="move" isAbstract="true"
+                       visibility="public">
+          <ownedParameter xmi:id="prm_move_dx" name="dx" kind="in">
+            <type href="#prim_int"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_move_dy" name="dy" kind="in">
+            <type href="#prim_int"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_move_map" name="map" kind="in">
+            <type href="#cls_ServerBlock"/>
+            <lowerValue xmi:type="uml:LiteralInteger" xmi:id="lv_map_lo" value="0"/>
+            <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="lv_map_hi" value="-1"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_move_ret" name="" kind="return">
+            <type href="#prim_boolean"/>
+          </ownedParameter>
+        </ownedOperation>
+      </packagedElement>
+
+      <packagedElement xmi:type="uml:Class" xmi:id="cls_ServerNpc" name="ServerNpc">
+        <ownedAttribute xmi:id="at_npc_color" name="colorHex" visibility="public">
+          <type href="#prim_String"/>
+        </ownedAttribute>
+        <ownedOperation xmi:id="op_npc_tick" name="tick" visibility="public">
+          <ownedParameter xmi:id="prm_tick_dt" name="deltaMs" kind="in">
+            <type href="#prim_int"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_tick_map" name="map" kind="in">
+            <type href="#cls_ServerBlock"/>
+            <lowerValue xmi:type="uml:LiteralInteger" xmi:id="lv_tm_lo" value="0"/>
+            <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="lv_tm_hi" value="-1"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_tick_target" name="target" kind="in">
+            <type href="#cls_ServerCharacter"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_tick_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+        <ownedOperation xmi:id="op_npc_set" name="setBehaviour" visibility="public">
+          <ownedParameter xmi:id="prm_set_b" name="newBehaviour" kind="in">
+            <type href="#enum_NpcBehaviour"/>
+          </ownedParameter>
+          <ownedParameter xmi:id="prm_set_ret" name="" kind="return">
+            <type href="#prim_void"/>
+          </ownedParameter>
+        </ownedOperation>
+
+        <!-- Context holds exactly one strategy; the black diamond sits here. -->
+        <ownedMember xmi:type="uml:Property" xmi:id="prop_strategy" name="strategy"
+                     visibility="private" aggregation="composite"
+                     type="cls_NpcStrategy"/>
+        <ownedMember xmi:type="uml:Property" xmi:id="prop_behaviour" name="behaviour"
+                     visibility="private" type="enum_NpcBehaviour"/>
+        <ownedMember xmi:type="uml:Property" xmi:id="prop_lastBlocked" name="lastBlocked"
+                     visibility="private" type="prim_int"/>
+        <ownedMember xmi:type="uml:Property" xmi:id="prop_stuck" name="stuckTicks"
+                     visibility="private" type="prim_int"/>
+
+        <generalization xmi:id="gen_npc" general="#cls_ServerCharacter" specific="#cls_ServerNpc"/>
+      </packagedElement>
+
+      <packagedElement xmi:type="uml:Package" xmi:id="pkg_ai" name="com.example.server.model.ai">
+
+        <packagedElement xmi:type="uml:Interface" xmi:id="cls_NpcStrategy" name="NpcStrategy"
+                         isAbstract="true">
+          <ownedAttribute xmi:id="at_st_HOLD" name="HOLD" visibility="public" isStatic="true">
+            <type href="#prim_int"/>
+            <defaultValue xmi:type="uml:LiteralInteger" xmi:id="dv_HOLD" value="-1"/>
+          </ownedAttribute>
+          <ownedAttribute xmi:id="at_st_NOBLOCK" name="NO_BLOCK" visibility="public" isStatic="true">
+            <type href="#prim_int"/>
+            <defaultValue xmi:type="uml:LiteralInteger" xmi:id="dv_NOBLOCK" value="-2"/>
+          </ownedAttribute>
+          <ownedOperation xmi:id="op_st_choose" name="chooseStep" isAbstract="true"
+                         visibility="public">
+            <ownedParameter xmi:id="prm_ch_ctx" name="context" kind="in">
+              <type href="#cls_NpcContext"/>
+            </ownedParameter>
+            <ownedParameter xmi:id="prm_ch_ret" name="" kind="return">
+              <type href="#prim_int"/>
+            </ownedParameter>
+          </ownedOperation>
+          <ownedOperation xmi:id="op_st_desc" name="description" isAbstract="true"
+                         visibility="public">
+            <ownedParameter xmi:id="prm_de_ret" name="" kind="return">
+              <type href="#prim_String"/>
+            </ownedParameter>
+          </ownedOperation>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="cls_NpcContext" name="NpcContext">
+          <ownedAttribute xmi:id="at_ct_delta" name="deltaMs" visibility="public">
+            <type href="#prim_int"/>
+          </ownedAttribute>
+          <ownedAttribute xmi:id="at_ct_x" name="tileX" visibility="public">
+            <type href="#prim_int"/>
+          </ownedAttribute>
+          <ownedAttribute xmi:id="at_ct_y" name="tileY" visibility="public">
+            <type href="#prim_int"/>
+          </ownedAttribute>
+          <ownedAttribute xmi:id="at_ct_tx" name="targetTileX" visibility="public">
+            <type href="#prim_int"/>
+          </ownedAttribute>
+          <ownedAttribute xmi:id="at_ct_ty" name="targetTileY" visibility="public">
+            <type href="#prim_int"/>
+          </ownedAttribute>
+          <ownedAttribute xmi:id="at_ct_random" name="random" visibility="public">
+            <type href="#cls_random"/>
+          </ownedAttribute>
+          <ownedAttribute xmi:id="at_ct_blocked" name="blockedDirection" visibility="public">
+            <type href="#prim_int"/>
+          </ownedAttribute>
+          <ownedOperation xmi:id="op_ct_blocked" name="isBlocked" visibility="public">
+            <ownedParameter xmi:id="prm_bl_dir" name="direction" kind="in">
+              <type href="#prim_int"/>
+            </ownedParameter>
+            <ownedParameter xmi:id="prm_bl_ret" name="" kind="return">
+              <type href="#prim_boolean"/>
+            </ownedParameter>
+          </ownedOperation>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Enumeration" xmi:id="enum_NpcBehaviour" name="NpcBehaviour">
+          <ownedLiteral xmi:id="lit_WANDERER" name="WANDERER"/>
+          <ownedLiteral xmi:id="lit_PATROLLER" name="PATROLLER"/>
+          <ownedLiteral xmi:id="lit_CHASER" name="CHASER"/>
+          <ownedLiteral xmi:id="lit_COWARD" name="COWARD"/>
+          <ownedLiteral xmi:id="lit_SENTINEL" name="SENTINEL"/>
+          <ownedOperation xmi:id="op_b_create" name="create" isAbstract="true"
+                         visibility="public">
+            <ownedParameter xmi:id="prm_cr_rnd" name="random" kind="in">
+              <type href="#cls_random"/>
+            </ownedParameter>
+            <ownedParameter xmi:id="prm_cr_ret" name="" kind="return">
+              <type href="#cls_NpcStrategy"/>
+            </ownedParameter>
+          </ownedOperation>
+          <ownedOperation xmi:id="op_b_stuck" name="fallbackWhenStuck" visibility="public">
+            <ownedParameter xmi:id="prm_fs_ret" name="" kind="return">
+              <type href="#enum_NpcBehaviour"/>
+            </ownedParameter>
+          </ownedOperation>
+          <ownedOperation xmi:id="op_b_notarget" name="fallbackWithoutTarget" visibility="public">
+            <ownedParameter xmi:id="prm_fn_ret" name="" kind="return">
+              <type href="#enum_NpcBehaviour"/>
+            </ownedParameter>
+          </ownedOperation>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="cls_Wander" name="WanderStrategy">
+          <generalization xmi:id="real_Wander" general="#cls_NpcStrategy" specific="#cls_Wander"/>
+        </packagedElement>
+        <packagedElement xmi:type="uml:Class" xmi:id="cls_Patrol" name="PatrolStrategy">
+          <generalization xmi:id="real_Patrol" general="#cls_NpcStrategy" specific="#cls_Patrol"/>
+        </packagedElement>
+        <packagedElement xmi:type="uml:Class" xmi:id="cls_Chase" name="ChaseStrategy">
+          <generalization xmi:id="real_Chase" general="#cls_NpcStrategy" specific="#cls_Chase"/>
+        </packagedElement>
+        <packagedElement xmi:type="uml:Class" xmi:id="cls_Coward" name="CowardStrategy">
+          <generalization xmi:id="real_Coward" general="#cls_NpcStrategy" specific="#cls_Coward"/>
+        </packagedElement>
+        <packagedElement xmi:type="uml:Class" xmi:id="cls_Sentinel" name="SentinelStrategy">
+          <generalization xmi:id="real_Sentinel" general="#cls_NpcStrategy" specific="#cls_Sentinel"/>
+        </packagedElement>
+
+        <!-- Strategy is handed a parameter object, never the map. -->
+        <ownedMember xmi:type="uml:Dependency" xmi:id="dep_ctx" name="uses"
+                     source="#cls_NpcStrategy" target="#cls_NpcContext"/>
+
+        <!-- NpcBehaviour is a factory layered on top, not a pattern participant. -->
+        <ownedMember xmi:type="uml:Dependency" xmi:id="dep_factory" name="creates"
+                     source="#enum_NpcBehaviour" target="#cls_NpcStrategy"/>
+      </packagedElement>
+
+      <!-- The context may swap its strategy at runtime. -->
+      <ownedMember xmi:type="uml:Dependency" xmi:id="dep_swap" name="swaps strategy"
+                   source="#cls_ServerNpc" target="#cls_NpcStrategy"/>
+    </packagedElement>
+
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_diagram" name="StrategyDiagram">
+      <ownedElement xmi:id="dia_strategy" name="Strategy - NPC behaviour"
+                    type="uml:ClassDiagram">
+        <ownedElement xmi:type="uml:Package" xmi:id="ref_pkg_ai" name="com.example.server.model.ai"
+                      source="#pkg_ai"/>
+        <ownedElement xmi:type="uml:Package" xmi:id="ref_pkg_model" name="com.example.server.model"
+                      source="#pkg_model"/>
+      </ownedElement>
+    </packagedElement>
+
+  </uml:Model>
+</xmi:XMI>

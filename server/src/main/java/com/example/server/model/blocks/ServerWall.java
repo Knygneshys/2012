@@ -1,4 +1,6 @@
-package com.example.server.model;
+package com.example.server.model.blocks;
+
+import com.example.server.model.TileType;
 
 /**
  * A wall of the map border and lattice. Survives every blast and stops it.

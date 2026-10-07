@@ -10,6 +10,8 @@ import java.awt.*;
  * Multiplayer Bomberman Client - connects to a server over the network.
  */
 public class MultiplayerApp {
+    private static final GameLogger log = GameLogger.getInstance();
+
     private static NetworkClient networkClient;
     private static JFrame connectionFrame;
 
@@ -24,7 +26,7 @@ public class MultiplayerApp {
             try {
                 port = Integer.parseInt(args[1]);
             } catch (NumberFormatException e) {
-                System.err.println("Invalid port: " + args[1]);
+                log.error("Invalid port: " + args[1], null);
                 System.exit(1);
             }
         }
@@ -79,7 +81,7 @@ public class MultiplayerApp {
                 try {
                     networkClient = new NetworkClient(host, port);
                     if (networkClient.connect()) {
-                        System.out.println("[Client] Connected to server!");
+                        log.info("Connected to server!");
 
                         // Set up response handler
                         networkClient.setOnServerResponse(msg -> {
@@ -148,8 +150,8 @@ public class MultiplayerApp {
             mapPanel.setFocusable(true);
             mapPanel.requestFocusInWindow();
 
-            System.out.println("[Client] Game started! Use WASD to move, SPACE to place bomb, R to reset.");
-            System.out.println("[Client] You are: " + playerName);
+            log.info("Game started! Use WASD to move, SPACE to place bomb, R to reset.");
+            log.info("You are: " + playerName);
         });
     }
 }
