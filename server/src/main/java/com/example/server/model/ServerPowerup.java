@@ -7,7 +7,7 @@ import java.util.Random;
  * breakable wall was destroyed and is consumed by the first player that walks
  * over it.
  */
-public class ServerPowerup extends ServerGameObject {
+public abstract class ServerPowerup extends ServerGameObject implements  IPowerUp{
     /**
      * The bonuses a powerup grants. The ordinal of each constant is what gets
      * sent over the network, so the order must match the client Powerup.Kind.
@@ -40,13 +40,8 @@ public class ServerPowerup extends ServerGameObject {
     /**
      * Applies this powerup's bonus to a player.
      */
-    public void applyTo(ServerPlayer player) {
-        switch (kind) {
-            case EXTRA_BOMB -> player.maxBombs += Kind.EXTRA_BOMB_STEP;
-            case BIGGER_BOMB -> player.bombRadius += Kind.BIGGER_BOMB_STEP;
-            case FASTER -> player.moveSpeed += Kind.FASTER_STEP;
-        }
-    }
+    @Override
+    public abstract boolean applyTo(ServerPlayer player);
 
     @Override
     public int tileX() {
@@ -56,5 +51,10 @@ public class ServerPowerup extends ServerGameObject {
     @Override
     public int tileY() {
         return tileY;
+    }
+
+    @Override
+    public int getKindId() {
+        return kind.ordinal();
     }
 }

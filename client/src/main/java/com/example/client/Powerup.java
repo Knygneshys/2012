@@ -14,7 +14,8 @@ public class Powerup extends GameObject {
     public enum Kind {
         EXTRA_BOMB("Bomb", new Color(50, 50, 50)),
         BIGGER_BOMB("Range", new Color(190, 70, 70)),
-        FASTER("Speed", new Color(70, 190, 90));
+        FASTER("Speed", new Color(70, 190, 90)),
+        PORTAL("Portal", new Color(145, 75, 220));
 
         public static final int EXTRA_BOMB_STEP = 1;
         public static final int BIGGER_BOMB_STEP = 1;
@@ -64,6 +65,9 @@ public class Powerup extends GameObject {
             case EXTRA_BOMB -> player.maxBombs += Kind.EXTRA_BOMB_STEP;
             case BIGGER_BOMB -> player.bombRadius += Kind.BIGGER_BOMB_STEP;
             case FASTER -> player.moveSpeed += Kind.FASTER_STEP;
+            case PORTAL -> {
+
+            }
         }
     }
 

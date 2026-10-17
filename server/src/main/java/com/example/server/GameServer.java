@@ -21,6 +21,13 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import com.example.server.model.ExtraBombPowerUp;
+import com.example.server.model.BiggerBombPowerUp;
+import com.example.server.model.FasterPowerUp;
+import com.example.server.model.PowerUpHandler;
+import com.example.server.model.IPowerUp;
+import com.example.server.model.Portal;
+import com.example.server.model.PortalAdapter;
 
 import java.io.IOException;
 import java.util.*;
@@ -46,7 +53,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
     private final List<ServerBomb> bombs = Collections.synchronizedList(new ArrayList<>());
     private final List<ServerExplosion> explosions = Collections.synchronizedList(new ArrayList<>());
     private final List<ServerNpc> npcs = Collections.synchronizedList(new ArrayList<>());
-    private final List<ServerPowerup> powerups = Collections.synchronizedList(new ArrayList<>());
+    private final PowerUpHandler powerUpHandler = new PowerUpHandler();
 
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private volatile boolean running = true;
@@ -201,31 +208,34 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
     /**
      * Drops a powerup on the tile a breakable wall was just destroyed on.
      */
-    private void maybeSpawnPowerup(int tileX, int tileY) {
-        if (powerups.size() >= GameConstants.MAX_POWERUPS) return;
-        if (random.nextDouble() >= GameConstants.POWERUP_DROP_CHANCE) return;
 
-        ServerPowerup powerup = new ServerPowerup(ServerPowerup.Kind.random(random), tileX, tileY);
-        powerups.add(powerup);
-        log.info("Dropped " + powerup.kind + " at " + tileX + "," + tileY);
+    private void maybeSpawnPowerup(int tileX, int tileY) {
+        if (powerUpHandler.getPowerUpCount() >= GameConstants.MAX_POWERUPS)
+            return;
+
+        if (random.nextDouble() >= GameConstants.POWERUP_DROP_CHANCE)
+            return;
+
+        IPowerUp powerUp = switch (random.nextInt(4)) {
+            case 0 -> new ExtraBombPowerUp(tileX, tileY);
+            case 1 -> new BiggerBombPowerUp(tileX, tileY);
+            case 2 -> new FasterPowerUp(tileX, tileY);
+            case 3 -> new PortalAdapter(new Portal(map, players.values(), npcs, bombs, explosions, random), tileX, tileY);
+            default -> throw new IllegalStateException("Unknown PowerUp");
+        };
+
+        powerUpHandler.addPowerUp(powerUp);
+
+        log.info("Dropped PowerUp " + powerUp.getKindId()
+                + " at " + tileX + "," + tileY);
     }
+
 
     /**
      * Players walk onto a powerup tile to collect it.
      */
     private void collectPowerups() {
-        Iterator<ServerPowerup> it = powerups.iterator();
-        while (it.hasNext()) {
-            ServerPowerup powerup = it.next();
-            for (ServerPlayer p : players.values()) {
-                if (p.alive && p.overlapsTile(powerup.tileX, powerup.tileY)) {
-                    powerup.applyTo(p);
-                    log.info("Player " + p.name + " collected " + powerup.kind);
-                    it.remove();
-                    break;
-                }
-            }
-        }
+        powerUpHandler.collectPowerUps(players.values());
     }
 
     /**
@@ -379,9 +389,12 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         }
 
         // Convert powerups
-        for (ServerPowerup powerup : powerups) {
+        for (IPowerUp powerup : powerUpHandler.getPowerUps()) {
             data.powerups.add(new GameStateData.PowerupData(
-                    powerup.kind.ordinal(), powerup.tileX, powerup.tileY));
+                    powerup.getKindId(),
+                    powerup.tileX(),
+                    powerup.tileY()
+            ));
         }
 
         return data;
@@ -489,7 +502,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         map = ServerMapFactory.createDefaultMap();
         bombs.clear();
         explosions.clear();
-        powerups.clear();
+        powerUpHandler.clear();
         spawnNpcs();
         for (ServerPlayer p : players.values()) {
             p.reset();
