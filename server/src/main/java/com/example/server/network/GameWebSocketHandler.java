@@ -1,9 +1,8 @@
 package com.example.server.network;
 
 import com.example.server.GameLogger;
-import com.example.server.GameServer;
-import com.google.gson.Gson;
-import org.springframework.context.annotation.Lazy;
+import com.example.server.GameFacade;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -15,11 +14,10 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private static final GameLogger log = GameLogger.getInstance();
 
-    private final GameServer gameServer;
-    private final Gson gson = new Gson();
+    private final GameFacade gameFacade;
 
-    public GameWebSocketHandler(@Lazy GameServer gameServer) {
-        this.gameServer = gameServer;
+    public GameWebSocketHandler(GameFacade gameFacade) {
+        this.gameFacade = gameFacade;
     }
 
     @Override
@@ -28,29 +26,22 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     }
 
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        String payload = message.getPayload();
+    protected void handleTextMessage(@NonNull WebSocketSession session, @NonNull TextMessage message) {
         try {
-            if (payload.contains("\"messageType\":\"PLAYER_JOIN\"")) {
-                PlayerJoinMessage msg = gson.fromJson(payload, PlayerJoinMessage.class);
-                gameServer.handlePlayerJoin(session, msg);
-            } else if (payload.contains("\"messageType\":\"PLAYER_INPUT\"")) {
-                PlayerInputMessage msg = gson.fromJson(payload, PlayerInputMessage.class);
-                gameServer.handlePlayerInput(session, msg);
-            }
+            gameFacade.handleMessage(session, message.getPayload());
         } catch (Exception e) {
             log.error("Error handling WebSocket message", e);
         }
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        gameServer.handleSessionClosed(session);
+    public void afterConnectionClosed(@NonNull WebSocketSession session, @NonNull CloseStatus status) {
+        gameFacade.disconnect(session);
     }
 
     @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) {
+    public void handleTransportError(WebSocketSession session, @NonNull Throwable exception) {
         log.error("Transport error for session " + session.getId(), exception);
-        gameServer.handleSessionClosed(session);
+        gameFacade.disconnect(session);
     }
 }
