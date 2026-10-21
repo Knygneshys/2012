@@ -8,6 +8,8 @@ import com.example.server.model.ServerNpc;
 import com.example.server.model.ServerPlayer;
 import com.example.server.model.ServerPowerup;
 import com.example.server.model.ai.NpcBehaviour;
+import com.example.server.model.builder.NpcBuilder;
+import com.example.server.model.builder.PlayerBuilder;
 import com.example.server.network.GameStateData;
 import com.example.server.network.GameStateMessage;
 import com.example.server.network.PlayerInputMessage;
@@ -266,12 +268,15 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             if (spot == null) break;
 
             NpcBehaviour behaviour = NpcBehaviour.forIndex(i);
-            ServerNpc npc = new ServerNpc(i + 1,
-                    spot[0] * GameConstants.TILE_SIZE,
-                    spot[1] * GameConstants.TILE_SIZE,
-                    GameConstants.NPC_MOVE_SPEED,
-                    GameConstants.NPC_COLORS[i % GameConstants.NPC_COLORS.length],
-                    behaviour, behaviour.create(random), random);
+            ServerNpc npc = new NpcBuilder()
+                    .id(i + 1)
+                    .position(spot[0] * GameConstants.TILE_SIZE,
+                            spot[1] * GameConstants.TILE_SIZE)
+                    .color(GameConstants.NPC_COLORS[i % GameConstants.NPC_COLORS.length])
+                    .moveSpeed(GameConstants.NPC_MOVE_SPEED)
+                    .behaviour(behaviour)
+                    .random(random)
+                    .build();
             npcs.add(npc);
         }
     }
@@ -412,13 +417,13 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         clientSessions.put(playerId, session);
         sessionIdToPlayerId.put(session.getId(), playerId);
 
-        ServerPlayer player = new ServerPlayer(
-                playerId,
-                msg.playerName,
-                GameConstants.SPAWN_X[playerId - 1] * GameConstants.TILE_SIZE,
-                GameConstants.SPAWN_Y[playerId - 1] * GameConstants.TILE_SIZE,
-                GameConstants.PLAYER_COLORS[playerId - 1]
-        );
+        ServerPlayer player = new PlayerBuilder()
+                .id(playerId)
+                .name(msg.playerName)
+                .position(GameConstants.SPAWN_X[playerId - 1] * GameConstants.TILE_SIZE,
+                        GameConstants.SPAWN_Y[playerId - 1] * GameConstants.TILE_SIZE)
+                .color(GameConstants.PLAYER_COLORS[playerId - 1])
+                .build();
         players.put(playerId, player);
 
         log.info("Player " + msg.playerName + " joined as Player #" + playerId);

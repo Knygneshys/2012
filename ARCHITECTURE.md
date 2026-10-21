@@ -157,6 +157,7 @@ Package: com.example.client
 
 Package: com.example.server
 ├── GameLogger (Singleton - one log instance per JVM, static initialization)
+├── GameFacade (Facade - routes game requests and status queries)
 └── GameServer
     └── ServerGameObject (shared tile anchor)
         ├── ServerCharacter (position, speed, alive, the movement rule)
@@ -221,6 +222,15 @@ constants at each call site. What differs is why:
 `TileType` stays the wire format on both sides, so its ordinal order is part of
 the protocol and must not change.
 
+## Facade — Server Game API
+
+`GameFacade` is the entry point used by the server's WebSocket handler and REST
+controller. It parses incoming join and input messages, routes them to
+`GameServer`, handles session removal, and composes status and player queries.
+The transport adapters no longer call the simulation directly. `GameServer`
+continues to own the authoritative game state and loop; the WebSocket and REST
+paths and message formats stay the same.
+
 ## Instance-Control Pattern
 
 `GameLogger` is a **Singleton**: one instance per JVM, reached through
@@ -235,8 +245,7 @@ of the locking that the lazy variants need.
 Two things deliberately stay away from the pattern. `GameServer` is already a
 Spring `@Component`, so the container guarantees one instance per context and
 owns its lifecycle; a static accessor on top of that would give two competing
-owners and hide the circular dependency `GameWebSocketHandler` currently has to
-break with `@Lazy`. And `Random` is not shared, since one global instance would
+owners. And `Random` is not shared, since one global instance would
 serialise every thread that draws from it and make rounds impossible to
 reproduce in a test.
 
