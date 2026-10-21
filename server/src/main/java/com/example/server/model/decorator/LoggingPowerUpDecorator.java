@@ -1,6 +1,8 @@
-package com.example.server.model;
+package com.example.server.model.decorator;
 
 import com.example.server.GameLogger;
+import com.example.server.model.IPowerUp;
+import com.example.server.model.ServerPlayer;
 
 /**
  * Adds collection logs around an existing power-up without changing its core behavior.

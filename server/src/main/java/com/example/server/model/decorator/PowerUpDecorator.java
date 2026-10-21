@@ -1,4 +1,7 @@
-package com.example.server.model;
+package com.example.server.model.decorator;
+
+import com.example.server.model.IPowerUp;
+import com.example.server.model.ServerPlayer;
 
 /**
  * Base decorator for IPowerUp implementations.
