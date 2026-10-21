@@ -28,6 +28,7 @@ import com.example.server.model.BiggerBombPowerUp;
 import com.example.server.model.FasterPowerUp;
 import com.example.server.model.PowerUpHandler;
 import com.example.server.model.IPowerUp;
+import com.example.server.model.LoggingPowerUpDecorator;
 import com.example.server.model.Portal;
 import com.example.server.model.PortalAdapter;
 
@@ -226,7 +227,8 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             default -> throw new IllegalStateException("Unknown PowerUp");
         };
 
-        powerUpHandler.addPowerUp(powerUp);
+        IPowerUp decoratedPowerUp = new LoggingPowerUpDecorator(powerUp);
+        powerUpHandler.addPowerUp(decoratedPowerUp);
 
         log.info("Dropped PowerUp " + powerUp.getKindId()
                 + " at " + tileX + "," + tileY);
