@@ -10,12 +10,12 @@ public class CommandDispatcher {
     private final Map<Integer, Command> commands = new HashMap<>();
 
     public CommandDispatcher(NetworkClient networkClient) {
-        commands.put(KeyEvent.VK_W, new NetworkCommand(networkClient, "UP"));
-        commands.put(KeyEvent.VK_S, new NetworkCommand(networkClient, "DOWN"));
-        commands.put(KeyEvent.VK_A, new NetworkCommand(networkClient, "LEFT"));
-        commands.put(KeyEvent.VK_D, new NetworkCommand(networkClient, "RIGHT"));
-        commands.put(KeyEvent.VK_SPACE, new NetworkCommand(networkClient, "BOMB"));
-        commands.put(KeyEvent.VK_R, new NetworkCommand(networkClient, "RESET"));
+        commands.put(KeyEvent.VK_W, new MoveUpCommand(networkClient));
+        commands.put(KeyEvent.VK_S, new MoveDownCommand(networkClient));
+        commands.put(KeyEvent.VK_A, new MoveLeftCommand(networkClient));
+        commands.put(KeyEvent.VK_D, new MoveRightCommand(networkClient));
+        commands.put(KeyEvent.VK_SPACE, new PlaceBombCommand(networkClient));
+        commands.put(KeyEvent.VK_R, new ResetGameCommand(networkClient));
     }
 
     public void execute(int keyCode) {
@@ -25,4 +25,3 @@ public class CommandDispatcher {
         }
     }
 }
-
