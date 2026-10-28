@@ -1,5 +1,6 @@
 package com.example.client;
 
+import com.example.client.command.CommandDispatcher;
 import com.example.client.network.NetworkClient;
 import com.example.client.network.GameStateMessage;
 import com.example.client.observer.MapStateObserver;
@@ -32,11 +33,13 @@ public class GameController {
     private final MapPanel mapPanel;
     private final NetworkClient networkClient;
     private final GameStateSubject gameState = new GameStateSubject();
+    private final CommandDispatcher commandDispatcher;
 
     public GameController(Player player, MapPanel mapPanel, TileType[][] map, NetworkClient networkClient) {
         this.player = player;
         this.mapPanel = mapPanel;
         this.networkClient = networkClient;
+        this.commandDispatcher = new CommandDispatcher(networkClient);
 
         // Each observer is handed only what it needs and told about only one
         // slice of the update. The local player id is read through a supplier
@@ -52,14 +55,7 @@ public class GameController {
             @Override
             public void keyPressed(java.awt.event.KeyEvent e) {
                 int key = e.getKeyCode();
-                switch (key) {
-                    case KeyEvent.VK_W -> networkClient.sendPlayerInput("UP");
-                    case KeyEvent.VK_S -> networkClient.sendPlayerInput("DOWN");
-                    case KeyEvent.VK_A -> networkClient.sendPlayerInput("LEFT");
-                    case KeyEvent.VK_D -> networkClient.sendPlayerInput("RIGHT");
-                    case KeyEvent.VK_SPACE -> networkClient.sendPlayerInput("BOMB");
-                    case KeyEvent.VK_R -> networkClient.sendPlayerInput("RESET");
-                }
+                commandDispatcher.execute(key);
                 mapPanel.repaint();
             }
         });

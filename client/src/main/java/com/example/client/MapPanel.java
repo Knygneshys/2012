@@ -17,8 +17,8 @@ import java.util.Set;
 import javax.swing.JPanel;
 import javax.swing.Timer;
 import com.example.client.factories.MapElementFactory;
-import com.example.client.factories.ClassicMapElementFactory;
-import com.example.client.factories.IceMapElementFactory;
+import com.example.client.bridge.MapElementFactoryBridge;
+import com.example.client.bridge.IceTileTheme;
 
 public class MapPanel extends JPanel {
     private final MapElementFactory mapElementFactory;
@@ -44,7 +44,7 @@ public class MapPanel extends JPanel {
 
     public MapPanel(TileType[][] map, Player player) {
         this.player = player;
-        this.mapElementFactory = new IceMapElementFactory();
+        this.mapElementFactory = new MapElementFactoryBridge(new IceTileTheme());
         setMap(map);
         setPreferredSize(new Dimension(
                 DemoMapFactory.MAP_WIDTH * TILE_SIZE,

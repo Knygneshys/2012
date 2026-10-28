@@ -6,7 +6,6 @@ import com.example.server.model.ServerExplosion;
 import com.example.server.model.ServerMapFactory;
 import com.example.server.model.ServerNpc;
 import com.example.server.model.ServerPlayer;
-import com.example.server.model.ServerPowerup;
 import com.example.server.model.ai.NpcBehaviour;
 import com.example.server.model.builder.NpcBuilder;
 import com.example.server.model.builder.PlayerBuilder;
@@ -28,6 +27,8 @@ import com.example.server.model.BiggerBombPowerUp;
 import com.example.server.model.FasterPowerUp;
 import com.example.server.model.PowerUpHandler;
 import com.example.server.model.IPowerUp;
+import com.example.server.model.decorator.LoggingPowerUpDecorator;
+import com.example.server.model.decorator.SafeApplyPowerUpDecorator;
 import com.example.server.model.Portal;
 import com.example.server.model.PortalAdapter;
 
@@ -226,7 +227,11 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             default -> throw new IllegalStateException("Unknown PowerUp");
         };
 
-        powerUpHandler.addPowerUp(powerUp);
+        // Compose decorators at runtime so cross-cutting behavior stays outside concrete powerups.
+        IPowerUp decoratedPowerUp = new SafeApplyPowerUpDecorator(
+                new LoggingPowerUpDecorator(powerUp)
+        );
+        powerUpHandler.addPowerUp(decoratedPowerUp);
 
         log.info("Dropped PowerUp " + powerUp.getKindId()
                 + " at " + tileX + "," + tileY);
