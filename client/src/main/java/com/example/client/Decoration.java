@@ -1,6 +1,7 @@
+
 package com.example.client;
 
-public class Decoration implements IPrototype {
+public abstract class Decoration implements IPrototype {
     private int x;
     private int y;
     private DecorationStyle style;
@@ -12,17 +13,17 @@ public class Decoration implements IPrototype {
     }
 
     @Override
-    public Decoration clone(boolean shallow) {
-        if (shallow) {
-            return new Decoration(x, y, style);
-        } else {
-            DecorationStyle styleCopy = new DecorationStyle(
-                    style.getName(),
-                    style.getColor()
-            );
+    public abstract Decoration clone(boolean shallow);
 
-            return new Decoration(x, y, styleCopy);
+    protected DecorationStyle copyStyle(boolean shallow) {
+        if (shallow) {
+            return style;
         }
+
+        return new DecorationStyle(
+                style.getName(),
+                style.getColor()
+        );
     }
 
     public void setPosition(int x, int y) {

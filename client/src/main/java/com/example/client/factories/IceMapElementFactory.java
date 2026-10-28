@@ -6,6 +6,7 @@ import com.example.client.IceBreakableWall;
 import com.example.client.IcePassage;
 import com.example.client.Decoration;
 import com.example.client.DecorationStyle;
+import com.example.client.IceDecoration;
 import java.awt.Color;
 
 public class IceMapElementFactory implements MapElementFactory {
@@ -25,9 +26,10 @@ public class IceMapElementFactory implements MapElementFactory {
         return new IcePassage(x, y, tileSize);
     }
 
+
     @Override
     public Decoration createDecoration() {
-        return new Decoration(0, 0, new DecorationStyle("SNOWMAN", Color.WHITE));
+        return new IceDecoration(0, 0, new DecorationStyle("SNOWMAN", Color.WHITE));
     }
 
 }

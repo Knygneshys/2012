@@ -4,10 +4,7 @@ import java.awt.Color;
 
 public class PrototypeTest {
     public static void main(String[] args) {
-        Decoration original = new Decoration(
-                0, 0,
-                new DecorationStyle("BARREL", Color.RED)
-        );
+        Decoration original = new ClassicDecoration(0, 0, new DecorationStyle("BARREL", Color.RED));
 
         Decoration shallow = original.clone(true);
         Decoration deep = original.clone(false);
