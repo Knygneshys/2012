@@ -6,6 +6,7 @@ import com.example.client.ClassicPassage;
 import com.example.client.ClassicWall;
 import com.example.client.Decoration;
 import com.example.client.DecorationStyle;
+import com.example.client.ClassicDecoration;
 import java.awt.Color;
 
 public class ClassicTileTheme implements TileTheme {
@@ -24,10 +25,12 @@ public class ClassicTileTheme implements TileTheme {
         return new ClassicPassage(x, y, tileSize);
     }
 
+
     @Override
     public Decoration createDecoration() {
-        return new Decoration(0, 0, new DecorationStyle("BARREL", new Color(150, 85, 45)));
+        return new ClassicDecoration(0, 0, new DecorationStyle("BARREL", new Color(150, 85, 45)));
     }
+
 
 }
 
