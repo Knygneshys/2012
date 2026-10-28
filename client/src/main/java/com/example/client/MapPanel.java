@@ -37,6 +37,7 @@ public class MapPanel extends JPanel {
 
     private final List<Bomb> bombs = new ArrayList<>();
     private final List<Explosion> explosions = new ArrayList<>();
+    private final List<Decoration> decorations = new ArrayList<>();
     private List<int[]> serverBombs = new ArrayList<>(); // Bombs from server
     private final Timer timer;
 
@@ -46,6 +47,7 @@ public class MapPanel extends JPanel {
         this.player = player;
         this.mapElementFactory = new MapElementFactoryBridge(new IceTileTheme());
         setMap(map);
+        generateDecorations();
         setPreferredSize(new Dimension(
                 DemoMapFactory.MAP_WIDTH * TILE_SIZE,
                 DemoMapFactory.MAP_HEIGHT * TILE_SIZE
@@ -66,6 +68,30 @@ public class MapPanel extends JPanel {
         this.map = map;
         this.blocks = Block.fromMap(map, TILE_SIZE, mapElementFactory);
     }
+
+    private void generateDecorations() {
+        decorations.clear();
+
+        Decoration prototype = mapElementFactory.createDecoration();
+
+        for (int y = 1; y < map.length - 1; y++) {
+            for (int x = 1; x < map[y].length - 1; x++) {
+
+                if (map[y][x] != TileType.FLOOR) {
+                    continue;
+                }
+
+                if ((x * 17 + y * 11) % 13 != 0) {
+                    continue;
+                }
+
+                Decoration decoration = prototype.clone(false);
+                decoration.setPosition(x, y);
+                decorations.add(decoration);
+            }
+        }
+    }
+
 
     public TileType[][] getMap() {
         return map;
@@ -131,6 +157,7 @@ public class MapPanel extends JPanel {
     public void resetGame() {
         // regenerate map
         setMap(DemoMapFactory.createDefaultMap());
+        generateDecorations();
         bombs.clear();
         explosions.clear();
         remotePlayers.clear();
@@ -264,6 +291,53 @@ public class MapPanel extends JPanel {
         }
     }
 
+
+    private void drawDecorations(Graphics g) {
+        for (Decoration decoration : decorations) {
+            int x = decoration.getX() * TILE_SIZE;
+            int y = decoration.getY() * TILE_SIZE;
+
+            DecorationStyle style = decoration.getStyle();
+
+            if (style.getName().equals("BARREL")) {
+                // Barrel body
+                g.setColor(style.getColor());
+                g.fillRect(x + 10, y + 7, 20, 26);
+
+                // Metal bands
+                g.setColor(Color.DARK_GRAY);
+                g.fillRect(x + 10, y + 11, 20, 4);
+                g.fillRect(x + 10, y + 25, 20, 4);
+
+                // Outline
+                g.setColor(Color.BLACK);
+                g.drawRect(x + 10, y + 7, 20, 26);
+
+            } else if (style.getName().equals("SNOWMAN")) {
+                // Body
+                g.setColor(style.getColor());
+                g.fillOval(x + 10, y + 18, 20, 20);
+
+                // Head
+                g.fillOval(x + 14, y + 7, 12, 14);
+
+                // Eyes
+                g.setColor(Color.BLACK);
+                g.fillOval(x + 17, y + 12, 2, 2);
+                g.fillOval(x + 22, y + 12, 2, 2);
+
+                // Hat
+                g.fillRect(x + 13, y + 7, 14, 3);
+                g.fillRect(x + 17, y + 3, 6, 5);
+
+                // Nose
+                g.setColor(Color.ORANGE);
+                g.fillRect(x + 20, y + 16, 5, 2);
+            }
+        }
+    }
+
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -287,6 +361,8 @@ public class MapPanel extends JPanel {
                 g.drawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
             }
         }
+
+        drawDecorations(g);
 
         // draw bombs
         for (Bomb b : frameBombs) {

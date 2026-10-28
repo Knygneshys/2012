@@ -2,6 +2,7 @@ package com.example.client.bridge;
 
 import com.example.client.Block;
 import com.example.client.factories.MapElementFactory;
+import com.example.client.Decoration;
 
 public class MapElementFactoryBridge implements MapElementFactory {
     private final TileTheme tileTheme;
@@ -24,5 +25,11 @@ public class MapElementFactoryBridge implements MapElementFactory {
     public Block createPassage(int x, int y, int tileSize) {
         return tileTheme.createPassage(x, y, tileSize);
     }
+
+    @Override
+    public Decoration createDecoration() {
+        return tileTheme.createDecoration();
+    }
+
 }
 
