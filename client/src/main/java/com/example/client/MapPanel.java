@@ -22,6 +22,7 @@ import com.example.client.bridge.IceTileTheme;
 
 public class MapPanel extends JPanel {
     private final MapElementFactory mapElementFactory;
+    private final TileAppearanceFactory tileAppearances;
     public static final int TILE_SIZE = 40;
     private static final Color GRID_COLOR = new Color(30, 30, 30);
 
@@ -46,6 +47,7 @@ public class MapPanel extends JPanel {
     public MapPanel(TileType[][] map, Player player) {
         this.player = player;
         this.mapElementFactory = new MapElementFactoryBridge(new IceTileTheme());
+        this.tileAppearances = new TileAppearanceFactory(mapElementFactory);
         setMap(map);
         generateDecorations();
         setPreferredSize(new Dimension(
@@ -355,8 +357,7 @@ public class MapPanel extends JPanel {
         for (int y = 0; y < frameBlocks.length; y++) {
             for (int x = 0; x < frameBlocks[0].length; x++) {
                 Block block = frameBlocks[y][x];
-                g.setColor(block.color());
-                g.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                tileAppearances.get(block.getTileType()).draw(g, x, y, TILE_SIZE);
                 g.setColor(GRID_COLOR);
                 g.drawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
             }

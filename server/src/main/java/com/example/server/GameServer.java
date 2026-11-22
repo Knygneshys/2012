@@ -4,6 +4,8 @@ import com.example.server.model.ServerBomb;
 import com.example.server.model.blocks.ServerBlock;
 import com.example.server.model.ServerExplosion;
 import com.example.server.model.ServerMapFactory;
+import com.example.server.model.ServerMapTiles;
+import com.example.server.model.GameIterator;
 import com.example.server.model.ServerNpc;
 import com.example.server.model.ServerPlayer;
 import com.example.server.model.ai.NpcBehaviour;
@@ -366,10 +368,10 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
 
         // Convert map. The wire format is the TileType ordinal, so the blocks
         // carry their type rather than being described directly.
-        for (int y = 0; y < map.length; y++) {
-            for (int x = 0; x < map[0].length; x++) {
-                data.map[y][x] = map[y][x].tileType().ordinal();
-            }
+        GameIterator<ServerBlock> mapTiles = new ServerMapTiles(map).createIterator();
+        while (mapTiles.hasNext()) {
+            ServerBlock block = mapTiles.next();
+            data.map[block.tileY()][block.tileX()] = block.tileType().ordinal();
         }
 
         // Convert players

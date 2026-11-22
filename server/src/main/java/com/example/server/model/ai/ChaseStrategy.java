@@ -30,33 +30,11 @@ package com.example.server.model.ai;
  * two tiles at the tick rate, which is the exact failure this class of bug
  * produces and the one this whole design exists to avoid.
  */
-public class ChaseStrategy implements NpcStrategy {
+public class ChaseStrategy extends TargetStrategy {
 
     @Override
-    public int chooseStep(NpcContext context) {
-        if (!context.hasTarget()) {
-            return HOLD;
-        }
-        int dx = context.deltaX();
-        int dy = context.deltaY();
-        if (dx == 0 && dy == 0) {
-            return HOLD;
-        }
-
-        boolean horizontalFirst = Math.abs(dx) >= Math.abs(dy);
-        int stepX = horizontalFirst ? Integer.signum(dx) : 0;
-        int stepY = horizontalFirst ? 0 : Integer.signum(dy);
-
-        int towards = NpcContext.directionIndex(stepX, stepY);
-        if (!context.isBlocked(towards)) {
-            return towards;
-        }
-
-        // The way towards the target is a wall, so close on the other axis.
-        int sideways = NpcContext.directionIndex(
-                horizontalFirst ? 0 : Integer.signum(dx),
-                horizontalFirst ? Integer.signum(dy) : 0);
-        return sideways;
+    protected int stepFor(int delta) {
+        return Integer.signum(delta);
     }
 
     @Override
