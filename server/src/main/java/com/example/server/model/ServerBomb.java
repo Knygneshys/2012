@@ -36,4 +36,9 @@ public class ServerBomb extends ServerGameObject {
         remainingMs -= deltaMs;
         return remainingMs <= 0;
     }
+
+    @Override
+    public void accept(com.example.server.model.visitor.GameObjectVisitor visitor) {
+        visitor.visit(this);
+    }
 }

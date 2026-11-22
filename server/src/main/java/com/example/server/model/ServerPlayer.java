@@ -38,4 +38,9 @@ public class ServerPlayer extends ServerCharacter {
         maxBombs = GameConstants.PLAYER_MAX_BOMBS;
         bombRadius = GameConstants.BOMB_RADIUS;
     }
+
+    @Override
+    public void accept(com.example.server.model.visitor.GameObjectVisitor visitor) {
+        visitor.visit(this);
+    }
 }

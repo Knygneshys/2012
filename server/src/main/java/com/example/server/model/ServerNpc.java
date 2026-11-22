@@ -140,6 +140,11 @@ public class ServerNpc extends ServerCharacter {
         return behaviour;
     }
 
+    @Override
+    public void accept(com.example.server.model.visitor.GameObjectVisitor visitor) {
+        visitor.visit(this);
+    }
+
     /**
      * Drops to the behaviour's declared fallback once there is nobody left to
      * react to, so a chaser does not keep hunting an empty map.

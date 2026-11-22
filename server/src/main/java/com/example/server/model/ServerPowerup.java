@@ -57,4 +57,9 @@ public abstract class ServerPowerup extends ServerGameObject implements  IPowerU
     public int getKindId() {
         return kind.ordinal();
     }
+
+    @Override
+    public void accept(com.example.server.model.visitor.GameObjectVisitor visitor) {
+        visitor.visit(this);
+    }
 }

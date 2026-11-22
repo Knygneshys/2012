@@ -31,6 +31,8 @@ import com.example.server.model.decorator.LoggingPowerUpDecorator;
 import com.example.server.model.decorator.SafeApplyPowerUpDecorator;
 import com.example.server.model.Portal;
 import com.example.server.model.PortalAdapter;
+import com.example.server.mediator.GameRoundMediator;
+import com.example.server.mediator.GameEventMediator;
 
 import java.io.IOException;
 import java.util.*;
@@ -58,6 +60,9 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
     private final List<ServerNpc> npcs = Collections.synchronizedList(new ArrayList<>());
     private final PowerUpHandler powerUpHandler = new PowerUpHandler();
 
+    /** Mediator that coordinates events between players, bombs, NPCs and powerups. */
+    private GameRoundMediator gameMediator;
+
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private volatile boolean running = true;
     private final Gson gson = new Gson();
@@ -66,6 +71,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
     public GameServer() {
         this.map = ServerMapFactory.createDefaultMap();
         spawnNpcs();
+        this.gameMediator = new GameRoundMediator(players, npcs, bombs, explosions, map);
     }
 
     public static void main(String[] args) {
@@ -81,6 +87,11 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         // captures a failure in a Future nobody reads, so any exception thrown
         // below would freeze the game for good without a word in the log.
         executorService.execute(this::gameLoop);
+
+        // Start console interpreter on a daemon thread so it doesn't block JVM shutdown
+        Thread consoleThread = new Thread(new com.example.server.interpreter.ConsoleInterpreter(this), "console-interpreter");
+        consoleThread.setDaemon(true);
+        consoleThread.start();
     }
 
     private void gameLoop() {
@@ -253,8 +264,8 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             if (!npc.alive) continue;
             for (ServerPlayer p : players.values()) {
                 if (p.alive && npc.overlaps(p)) {
-                    p.kill();
-                    log.info("Player " + p.name + " caught by NPC " + npc.id + "!");
+                    // Route through mediator: NPC does not kill player directly
+                    gameMediator.onNpcContactPlayer(npc, p);
                 }
             }
         }
@@ -372,16 +383,16 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             }
         }
 
-        // Convert players
+        // Convert players, bombs, and NPCs using SerializationVisitor
+        com.example.server.model.visitor.SerializationVisitor visitor = new com.example.server.model.visitor.SerializationVisitor(data);
         for (ServerPlayer p : players.values()) {
-            data.players.add(new GameStateData.PlayerData(
-                    p.id, p.name, p.x, p.y, p.alive, p.colorHex, p.moveSpeed
-            ));
+            p.accept(visitor);
         }
-
-        // Convert bombs
         for (ServerBomb b : bombs) {
-            data.bombs.add(new GameStateData.BombData(b.tileX, b.tileY, b.remainingMs, b.radius));
+            b.accept(visitor);
+        }
+        for (ServerNpc npc : npcs) {
+            npc.accept(visitor);
         }
 
         // Convert explosions
@@ -391,11 +402,6 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
                 tiles[i] = ex.tiles.get(i);
             }
             data.explosions.add(new GameStateData.ExplosionData(tiles, ex.remainingMs));
-        }
-
-        // Convert NPCs
-        for (ServerNpc npc : npcs) {
-            data.npcs.add(new GameStateData.NpcData(npc.id, npc.x, npc.y, npc.moveSpeed, npc.alive, npc.colorHex));
         }
 
         // Convert powerups
@@ -508,17 +514,42 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         return count;
     }
 
-    private synchronized void resetGame() {
+    public synchronized void resetGame() {
         map = ServerMapFactory.createDefaultMap();
         bombs.clear();
         explosions.clear();
         powerUpHandler.clear();
         spawnNpcs();
+        // Re-create mediator so it holds the new map reference after reset
+        this.gameMediator = new GameRoundMediator(players, npcs, bombs, explosions, map);
         for (ServerPlayer p : players.values()) {
             p.reset();
         }
         log.info("Game reset!");
     }
+
+    public int getActiveBombCount() {
+        return bombs.size();
+    }
+
+    public String getNpcSummary() {
+        if (npcs.isEmpty()) return "No NPCs.";
+        StringBuilder sb = new StringBuilder();
+        for (ServerNpc npc : npcs) {
+            sb.append(String.format("  NPC #%d pos=(%d,%d) alive=%b behaviour=%s%n",
+                    npc.id, npc.x, npc.y, npc.alive, npc.behaviour()));
+        }
+        return sb.toString();
+    }
+
+    public List<String> getAllGameObjectStats() {
+        com.example.server.model.visitor.GameObjectStatsVisitor statsVisitor = new com.example.server.model.visitor.GameObjectStatsVisitor();
+        for (ServerPlayer p : players.values()) p.accept(statsVisitor);
+        for (ServerNpc n : npcs) n.accept(statsVisitor);
+        for (ServerBomb b : bombs) b.accept(statsVisitor);
+        return statsVisitor.getLines();
+    }
+
 
     private synchronized int allocatePlayerId() {
         // Hand out the lowest free slot. A monotonic counter would lock the

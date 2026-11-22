@@ -70,4 +70,8 @@ public abstract class ServerBlock extends ServerGameObject {
         return tileType;
     }
 
+    @Override
+    public void accept(com.example.server.model.visitor.GameObjectVisitor visitor) {
+        visitor.visit(this);
+    }
 }
