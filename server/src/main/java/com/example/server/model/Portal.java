@@ -58,12 +58,13 @@ public class Portal {
     private List<int[]> findFreeTiles(ServerPlayer player) {
         List<int[]> freeTiles = new ArrayList<>();
 
-        for (int y = 0; y < map.length; y++) {
-            for (int x = 0; x < map[y].length; x++) {
-
-                if (isSafeTile(x, y, player)) {
-                    freeTiles.add(new int[]{x, y});
-                }
+        GameIterator<ServerBlock> tiles = new ServerMapTiles(map).createIterator();
+        while (tiles.hasNext()) {
+            ServerBlock block = tiles.next();
+            int x = block.tileX();
+            int y = block.tileY();
+            if (isSafeTile(x, y, player)) {
+                freeTiles.add(new int[]{x, y});
             }
         }
 
