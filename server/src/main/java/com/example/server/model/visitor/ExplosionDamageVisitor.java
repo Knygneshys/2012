@@ -35,7 +35,7 @@ public class ExplosionDamageVisitor implements GameObjectVisitor {
         for (ServerExplosion ex : explosions) {
             for (int[] tile : ex.tiles) {
                 if (player.overlapsTile(tile[0], tile[1])) {
-                    player.kill();
+                    player.killedBy("explosion");
                     log.info("Player " + player.name + " eliminated by explosion!");
                     return;
                 }

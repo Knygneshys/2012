@@ -72,6 +72,8 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         this.map = ServerMapFactory.createDefaultMap();
         spawnNpcs();
         this.gameMediator = new GameRoundMediator(players, npcs, bombs, explosions, map);
+        for (ServerNpc npc : npcs) npc.setMediator(gameMediator);
+        powerUpHandler.setMediator(gameMediator);
     }
 
     public static void main(String[] args) {
@@ -128,10 +130,10 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
                 detonated.add(b);
             }
         }
-        for (ServerBomb b : detonated) {
-            detonate(b);
-            bombs.remove(b);
-        }
+    for (ServerBomb b : detonated) {
+        b.explode();
+        bombs.remove(b);
+    }
 
         // Move NPCs before the fire is applied, so walking into a burning tile cannot
         // survive until the next tick. Each is handed the player it reacts to and
@@ -153,70 +155,11 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         // Burning tiles keep hurting whatever stands in them, so a character
         // that walks into a live explosion is caught by it too
         for (ServerExplosion ex : explosions) {
-            for (int[] tile : ex.tiles) {
-                applyBlast(tile[0], tile[1]);
-            }
+            gameMediator.applyExplosionDamage(ex);
         }
 
         checkNpcContact();
         collectPowerups();
-    }
-
-    private void detonate(ServerBomb b) {
-        ServerExplosion ex = new ServerExplosion();
-        int bx = b.tileX;
-        int by = b.tileY;
-
-        // center
-        ex.addTile(bx, by);
-        applyBlast(bx, by);
-
-        // four directions
-        int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-        for (int[] d : dirs) {
-            for (int step = 1; step <= b.radius; step++) {
-                int nx = bx + d[0] * step;
-                int ny = by + d[1] * step;
-                if (nx < 0 || ny < 0 || ny >= map.length || nx >= map[0].length) break;
-
-                ServerBlock block = map[ny][nx];
-                if (block.isDestructible()) {
-                    // A breakable wall is swallowed by the blast: it shows up in
-                    // the fire, turns into a passage and may drop a powerup.
-                    ex.addTile(nx, ny);
-                    map[ny][nx] = block.destroyed();
-                    maybeSpawnPowerup(nx, ny);
-                    break;
-                }
-                if (block.stopsBlast()) {
-                    // A wall survives, so the blast neither reaches nor passes it.
-                    break;
-                }
-
-                ex.addTile(nx, ny);
-                // check characters in the blast
-                applyBlast(nx, ny);
-            }
-        }
-        explosions.add(ex);
-    }
-
-    /**
-     * Applies a blast to a single tile, eliminating whatever stands on it.
-     */
-    private void applyBlast(int tileX, int tileY) {
-        for (ServerPlayer p : players.values()) {
-            if (p.alive && p.overlapsTile(tileX, tileY)) {
-                p.kill();
-                log.info("Player " + p.name + " eliminated!");
-            }
-        }
-        for (ServerNpc npc : npcs) {
-            if (npc.alive && npc.overlapsTile(tileX, tileY)) {
-                npc.kill();
-                log.info("NPC " + npc.id + " eliminated!");
-            }
-        }
     }
 
     /**
@@ -265,7 +208,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             for (ServerPlayer p : players.values()) {
                 if (p.alive && npc.overlaps(p)) {
                     // Route through mediator: NPC does not kill player directly
-                    gameMediator.onNpcContactPlayer(npc, p);
+                    npc.contactWith(p);
                 }
             }
         }
@@ -294,6 +237,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
                     .random(random)
                     .build();
             npcs.add(npc);
+            npc.setMediator(gameMediator);
         }
     }
 
@@ -436,6 +380,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
                 .color(GameConstants.PLAYER_COLORS[playerId - 1])
                 .build();
         players.put(playerId, player);
+        player.setMediator(gameMediator);
 
         log.info("Player " + msg.playerName + " joined as Player #" + playerId);
         log.info("Connected players: " + clientSessions.size() + "/" + GameConstants.MAX_PLAYERS);
@@ -502,6 +447,8 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         if (countBombsOf(p) >= p.maxBombs) return;
 
         bombs.add(new ServerBomb(tileX, tileY, GameConstants.BOMB_FUSE_MS, p.bombRadius, p.id));
+        ServerBomb lastBomb = bombs.get(bombs.size() - 1);
+        lastBomb.setMediator(gameMediator);
     }
 
     private int countBombsOf(ServerPlayer p) {
@@ -522,8 +469,10 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         spawnNpcs();
         // Re-create mediator so it holds the new map reference after reset
         this.gameMediator = new GameRoundMediator(players, npcs, bombs, explosions, map);
+        for (ServerNpc npc : npcs) npc.setMediator(gameMediator);
         for (ServerPlayer p : players.values()) {
             p.reset();
+            p.setMediator(gameMediator);
         }
         log.info("Game reset!");
     }

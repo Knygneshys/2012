@@ -121,7 +121,7 @@ public class GameRoundMediator implements GameEventMediator {
      * Kills any player or NPC overlapping a blast tile.
      * Also flags bombs caught in the blast for chain detonation.
      */
-    private void applyExplosionDamage(ServerExplosion ex) {
+    public void applyExplosionDamage(ServerExplosion ex) {
         java.util.List<ServerBomb> chainDetonations = new java.util.ArrayList<>();
         com.example.server.model.visitor.ExplosionDamageVisitor damageVisitor =
                 new com.example.server.model.visitor.ExplosionDamageVisitor(java.util.List.of(ex), chainDetonations);

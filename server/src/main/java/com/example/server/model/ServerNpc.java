@@ -4,6 +4,8 @@ import com.example.server.model.ai.NpcBehaviour;
 import com.example.server.model.ai.NpcContext;
 import com.example.server.model.ai.NpcStrategy;
 import com.example.server.model.blocks.ServerBlock;
+import com.example.server.mediator.GameEventMediator;
+import com.example.server.model.ServerPlayer;
 
 import java.util.Random;
 
@@ -138,6 +140,17 @@ public class ServerNpc extends ServerCharacter {
 
     public NpcBehaviour behaviour() {
         return behaviour;
+    }
+
+    /**
+     * Called when this NPC overlaps a player. Notifies the mediator which
+     * decides the consequence (killing the player, checking round state).
+     */
+    public void contactWith(ServerPlayer player) {
+        GameEventMediator mediator = getMediator();
+        if (mediator != null) {
+            mediator.onNpcContactPlayer(this, player);
+        }
     }
 
     @Override

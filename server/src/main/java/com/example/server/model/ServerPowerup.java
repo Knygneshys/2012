@@ -1,5 +1,8 @@
 package com.example.server.model;
 
+import com.example.server.mediator.GameEventMediator;
+import com.example.server.model.ServerPlayer;
+
 import java.util.Random;
 
 /**
@@ -31,10 +34,25 @@ public abstract class ServerPowerup extends ServerGameObject implements  IPowerU
     public final int tileX;
     public final int tileY;
 
+    private GameEventMediator mediator;
+
     public ServerPowerup(Kind kind, int tileX, int tileY) {
         this.kind = kind;
         this.tileX = tileX;
         this.tileY = tileY;
+    }
+
+    public void setMediator(GameEventMediator mediator) {
+        this.mediator = mediator;
+    }
+
+    /**
+     * Notifies the mediator that this powerup was collected by a player.
+     */
+    public void collectedBy(ServerPlayer player) {
+        if (mediator != null) {
+            mediator.onPowerUpCollected(player, this);
+        }
     }
 
     /**
