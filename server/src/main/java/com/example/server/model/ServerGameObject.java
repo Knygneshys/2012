@@ -21,4 +21,11 @@ public abstract class ServerGameObject {
      * Tile row this object occupies.
      */
     public abstract int tileY();
+
+    /**
+     * Accepts a visitor. Each concrete subclass calls back the matching
+     * overload on the visitor (double dispatch), so the visitor can operate
+     * on the concrete type without instanceof checks.
+     */
+    public abstract void accept(com.example.server.model.visitor.GameObjectVisitor visitor);
 }

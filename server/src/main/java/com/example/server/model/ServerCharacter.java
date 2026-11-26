@@ -3,6 +3,7 @@ package com.example.server.model;
 import com.example.server.model.blocks.ServerBlock;
 
 import com.example.server.GameConstants;
+import com.example.server.mediator.GameEventMediator;
 
 /**
  * Base class of every living entity the server simulates: the players and the
@@ -20,11 +21,21 @@ public abstract class ServerCharacter extends ServerGameObject {
     public int moveSpeed;
     public boolean alive = true;
 
+    private GameEventMediator mediator;
+
     protected ServerCharacter(int id, int x, int y, int moveSpeed) {
         this.id = id;
         this.x = x;
         this.y = y;
         this.moveSpeed = moveSpeed;
+    }
+
+    public void setMediator(GameEventMediator mediator) {
+        this.mediator = mediator;
+    }
+
+    public GameEventMediator getMediator() {
+        return mediator;
     }
 
     /**

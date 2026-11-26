@@ -1,5 +1,7 @@
 package com.example.server.model;
 
+import com.example.server.mediator.GameEventMediator;
+
 public class ServerBomb extends ServerGameObject {
     public int tileX;
     public int tileY;
@@ -9,6 +11,8 @@ public class ServerBomb extends ServerGameObject {
      * Id of the player that placed the bomb, used to enforce their bomb limit.
      */
     public int ownerId = -1;
+
+    private GameEventMediator mediator;
 
     public ServerBomb(int tileX, int tileY, int fuseMs, int radius) {
         this(tileX, tileY, fuseMs, radius, -1);
@@ -20,6 +24,20 @@ public class ServerBomb extends ServerGameObject {
         this.remainingMs = fuseMs;
         this.radius = radius;
         this.ownerId = ownerId;
+    }
+
+    public void setMediator(GameEventMediator mediator) {
+        this.mediator = mediator;
+    }
+
+    /**
+     * Detonates the bomb through the mediator instead of letting GameServer
+     * handle the blast directly.
+     */
+    public void explode() {
+        if (mediator != null) {
+            mediator.onBombExploded(this);
+        }
     }
 
     @Override
@@ -35,5 +53,10 @@ public class ServerBomb extends ServerGameObject {
     public boolean tick(int deltaMs) {
         remainingMs -= deltaMs;
         return remainingMs <= 0;
+    }
+
+    @Override
+    public void accept(com.example.server.model.visitor.GameObjectVisitor visitor) {
+        visitor.visit(this);
     }
 }

@@ -1,6 +1,7 @@
 package com.example.server.model;
 
 import com.example.server.GameConstants;
+import com.example.server.mediator.GameEventMediator;
 
 /**
  * A connected player. Position, speed and the movement rule come from
@@ -37,5 +38,22 @@ public class ServerPlayer extends ServerCharacter {
         moveSpeed = GameConstants.PLAYER_MOVE_SPEED;
         maxBombs = GameConstants.PLAYER_MAX_BOMBS;
         bombRadius = GameConstants.BOMB_RADIUS;
+    }
+
+    @Override
+    public void accept(com.example.server.model.visitor.GameObjectVisitor visitor) {
+        visitor.visit(this);
+    }
+
+    /**
+     * Kills this player and notifies the mediator so it can log the death and
+     * check round end conditions.
+     */
+    public void killedBy(String cause) {
+        kill();
+        GameEventMediator mediator = getMediator();
+        if (mediator != null) {
+            mediator.onPlayerKilled(this, cause);
+        }
     }
 }
