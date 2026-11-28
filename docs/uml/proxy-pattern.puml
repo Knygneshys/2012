@@ -1,0 +1,54 @@
+@startuml proxy-pattern
+title Proxy Pattern (Protection Proxy)
+
+interface GameService <<Subject>> {
+  +handlePlayerJoin(session, msg)
+  +handlePlayerInput(session, msg)
+  +handleSessionClosed(session)
+  +resetGame()
+  +startGame()
+  +returnToLobby()
+  +getPhase(): GamePhase
+  +getPlayerIdForSession(sessionId): Integer
+  +getPlayerIds(): List<Integer>
+  +isPlayerAlive(playerId): boolean
+  +getPlayerSummaryList(): List<Map>
+}
+
+class GameServer <<RealSubject>> {
+  -players: Map<Integer, ServerPlayer>
+  +handlePlayerInput(session, msg)
+  +resetGame()
+  +startGame()
+  +returnToLobby()
+  +getPhase(): GamePhase
+}
+
+class GameServerProxy <<Proxy>> {
+  -realServer: GameServer
+  -hostPlayerId: int
+  -lastMoveAt: Map<Integer, Long>
+  +handlePlayerInput(session, msg)
+  -allowMove(playerId): boolean
+  -broadcastHost(message)
+}
+
+class GameFacade <<Client>> {
+  -gameServer: GameService
+}
+
+class ConsoleInterpreter
+note right of ConsoleInterpreter : Trusted admin console:\nuses GameServer directly,\nbypassing player checks
+
+GameService <|.. GameServer
+GameService <|.. GameServerProxy
+GameServerProxy o--> GameServer : forwards allowed requests
+GameFacade --> GameService
+ConsoleInterpreter --> GameServer
+
+note bottom of GameServerProxy
+  START / RESET / LOBBY: host only (else ACCESS_CONTROL denied)
+  Moves: max one per MIN_MOVE_INTERVAL_MS
+  Dead players: inputs dropped
+end note
+@enduml

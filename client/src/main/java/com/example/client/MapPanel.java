@@ -18,11 +18,12 @@ import javax.swing.JPanel;
 import javax.swing.Timer;
 import com.example.client.factories.MapElementFactory;
 import com.example.client.bridge.MapElementFactoryBridge;
-import com.example.client.bridge.IceTileTheme;
+import com.example.client.bridge.Theme;
 
 public class MapPanel extends JPanel {
-    private final MapElementFactory mapElementFactory;
-    private final TileAppearanceFactory tileAppearances;
+    private MapElementFactory mapElementFactory;
+    private TileAppearanceFactory tileAppearances;
+    private Theme theme;
     public static final int TILE_SIZE = 40;
     private static final Color GRID_COLOR = new Color(30, 30, 30);
 
@@ -43,13 +44,27 @@ public class MapPanel extends JPanel {
     private final Timer timer;
 
     private static final int TICK_MS = 100;
+    private static final int NOTICE_MS = 2500;
+    /** Server bomb fuse, used to scale the blast preview's urgency. */
+    private static final int FUSE_MS = 2000;
+
+    // Host / access-control info from the server's protection proxy
+    private volatile int hostPlayerId = -1;
+    private volatile int localPlayerId = -1;
+    private volatile String notice;
+    private volatile long noticeUntil;
+
+    // Lobby (set by HudStateObserver)
+    private volatile boolean lobby;
+    private volatile List<String> lobbyPlayers = List.of();
+
+    private final CharacterSprite sprites = new CharacterSprite();
+    private InGameMenu menu;
 
     public MapPanel(TileType[][] map, Player player) {
         this.player = player;
-        this.mapElementFactory = new MapElementFactoryBridge(new IceTileTheme());
-        this.tileAppearances = new TileAppearanceFactory(mapElementFactory);
-        setMap(map);
-        generateDecorations();
+        this.map = map;
+        applyTheme(Theme.loadSaved());
         setPreferredSize(new Dimension(
                 DemoMapFactory.MAP_WIDTH * TILE_SIZE,
                 DemoMapFactory.MAP_HEIGHT * TILE_SIZE
@@ -94,6 +109,72 @@ public class MapPanel extends JPanel {
         }
     }
 
+
+    /** Updates who the host is, so the host's name gets a star and the death overlay shows the right hint. */
+    public void setHostInfo(int hostPlayerId, int localPlayerId) {
+        this.hostPlayerId = hostPlayerId;
+        this.localPlayerId = localPlayerId;
+        repaint();
+    }
+
+    /** Shows a short banner at the top of the map, e.g. when the server refuses an action. */
+    public void showNotice(String text) {
+        this.notice = text;
+        this.noticeUntil = System.currentTimeMillis() + NOTICE_MS;
+        repaint();
+    }
+
+    /** Switches the lobby overlay on or off; {@code playerLabels} are the names listed in it. */
+    public void setLobby(boolean lobby, List<String> playerLabels) {
+        this.lobby = lobby;
+        this.lobbyPlayers = List.copyOf(playerLabels);
+    }
+
+    public boolean isLobby() {
+        return lobby;
+    }
+
+    /** The Esc menu to draw on top of everything else. */
+    public void setMenu(InGameMenu menu) {
+        this.menu = menu;
+    }
+
+    public Theme getTheme() {
+        return theme;
+    }
+
+    /** Switches to the next (dir = 1) or previous (dir = -1) theme and remembers it. */
+    public void cycleTheme(int dir) {
+        applyTheme(theme.step(dir));
+        theme.save();
+        repaint();
+    }
+
+    /**
+     * Bridge pattern: swapping the {@link com.example.client.bridge.TileTheme}
+     * behind the bridge re-skins the whole map; walls, floor, decorations and
+     * the cached tile colours are rebuilt from it.
+     */
+    private void applyTheme(Theme newTheme) {
+        this.theme = newTheme;
+        this.mapElementFactory = new MapElementFactoryBridge(newTheme.create());
+        this.tileAppearances = new TileAppearanceFactory(mapElementFactory);
+        setMap(map);
+        generateDecorations();
+    }
+
+    /** Stops the repaint timer once this panel is no longer shown. */
+    public void stop() {
+        timer.stop();
+    }
+
+    private boolean isLocalHost() {
+        return localPlayerId != -1 && localPlayerId == hostPlayerId;
+    }
+
+    private String labelFor(String name, int playerId) {
+        return playerId != -1 && playerId == hostPlayerId ? "\u2605 " + name : name;
+    }
 
     public TileType[][] getMap() {
         return map;
@@ -315,6 +396,16 @@ public class MapPanel extends JPanel {
                 g.setColor(Color.BLACK);
                 g.drawRect(x + 10, y + 7, 20, 26);
 
+            } else if (style.getName().equals("CACTUS")) {
+                g.setColor(style.getColor());
+                g.fillRoundRect(x + 16, y + 6, 8, 30, 8, 8);      // trunk
+                g.fillRoundRect(x + 8, y + 14, 6, 12, 6, 6);      // left arm
+                g.fillRect(x + 8, y + 22, 10, 4);
+                g.fillRoundRect(x + 26, y + 10, 6, 12, 6, 6);     // right arm
+                g.fillRect(x + 22, y + 18, 10, 4);
+                g.setColor(style.getColor().darker());
+                g.drawLine(x + 20, y + 9, x + 20, y + 33);
+
             } else if (style.getName().equals("SNOWMAN")) {
                 // Body
                 g.setColor(style.getColor());
@@ -364,6 +455,7 @@ public class MapPanel extends JPanel {
         }
 
         drawDecorations(g);
+        drawBlastPreview(g, frameServerBombs);
 
         // draw bombs
         for (Bomb b : frameBombs) {
@@ -402,67 +494,148 @@ public class MapPanel extends JPanel {
             }
         }
 
-        // Draw local player
-        int playerX = player.getX();
-        int playerY = player.getY();
-        g.setColor(player.alive ? player.color : Character.DEAD_COLOR);
-        g.fillOval(playerX, playerY, TILE_SIZE, TILE_SIZE);
+        Set<String> onMap = new HashSet<>();
 
-        // Draw player name label
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setColor(Color.WHITE);
-        g2.setFont(new Font("SansSerif", Font.BOLD, 10));
-        g2.drawString(player.name, playerX, playerY - 2);
-        g2.dispose();
-
-        // Draw remote players
-        List<RemotePlayer> frameRemotePlayers = new ArrayList<>(remotePlayers.values());
-        for (RemotePlayer rp : frameRemotePlayers) {
-            g.setColor(rp.alive ? rp.color : Character.DEAD_COLOR);
-            g.fillOval(rp.x, rp.y, TILE_SIZE, TILE_SIZE);
-
-            // Draw player name label
-            g2 = (Graphics2D) g.create();
-            g2.setColor(Color.WHITE);
-            g2.setFont(new Font("SansSerif", Font.BOLD, 10));
-            g2.drawString(rp.name, rp.x, rp.y - 2);
-            g2.dispose();
-        }
-
-        // Draw NPCs
+        // Draw NPCs (under the players)
         for (NPC npc : frameNpcs) {
             if (!npc.alive) continue;
-            int nx = npc.getX();
-            int ny = npc.getY();
-            int pad = TILE_SIZE / 6;
-            g.setColor(npc.color);
-            g.fillOval(nx + pad, ny + pad, TILE_SIZE - pad * 2, TILE_SIZE - pad * 2);
-            g.setColor(Color.BLACK);
-            g.fillRect(nx + TILE_SIZE / 3, ny + TILE_SIZE / 3, 4, 4);
-            g.fillRect(nx + TILE_SIZE / 2 + 2, ny + TILE_SIZE / 3, 4, 4);
+            String key = "n" + npc.id;
+            onMap.add(key);
+            sprites.drawNpc(g, key, npc.getX(), npc.getY(), TILE_SIZE, npc.color);
+        }
 
-            g2 = (Graphics2D) g.create();
-            g2.setColor(Color.WHITE);
-            g2.setFont(new Font("SansSerif", Font.BOLD, 10));
-            g2.drawString(npc.name, nx, ny - 2);
-            g2.dispose();
+        // Draw remote players, then the local one on top
+        List<RemotePlayer> frameRemotePlayers = new ArrayList<>(remotePlayers.values());
+        for (RemotePlayer rp : frameRemotePlayers) {
+            String key = "p" + rp.id;
+            onMap.add(key);
+            sprites.drawPlayer(g, key, rp.x, rp.y, TILE_SIZE, rp.color, rp.alive);
+            drawNameTag(g, labelFor(rp.name, rp.id), rp.x, rp.y);
+        }
+        onMap.add("local");
+        sprites.drawPlayer(g, "local", player.getX(), player.getY(), TILE_SIZE, player.color, player.alive);
+        drawNameTag(g, labelFor(player.name, localPlayerId), player.getX(), player.getY());
+        sprites.retain(onMap);
+
+        if (lobby) {
+            drawLobbyOverlay(g);
         }
 
         // if dead, draw retry overlay
-        if (!player.alive) {
+        if (!player.alive && !lobby) {
             Graphics2D g2d = (Graphics2D) g.create();
             g2d.setColor(new Color(0, 0, 0, 160));
             g2d.fillRect(0, 0, getWidth(), getHeight());
             g2d.setColor(Color.WHITE);
             g2d.setFont(new Font("SansSerif", Font.BOLD, 28));
             String msg = "You Died";
-            String hint = "Press R to Retry";
+            String hint = isLocalHost() ? "Press R to restart the round" : "Spectating - waiting for the host";
             int mw = g2d.getFontMetrics().stringWidth(msg);
             int hw = g2d.getFontMetrics().stringWidth(hint);
             g2d.drawString(msg, (getWidth() - mw) / 2, getHeight() / 2 - 10);
             g2d.drawString(hint, (getWidth() - hw) / 2, getHeight() / 2 + 30);
             g2d.dispose();
         }
+
+        // notice banner (e.g. "Only the host can restart the round")
+        String currentNotice = notice;
+        if (currentNotice != null && System.currentTimeMillis() < noticeUntil) {
+            Graphics2D g2d = (Graphics2D) g.create();
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 14));
+            int w = g2d.getFontMetrics().stringWidth(currentNotice) + 24;
+            int x = (getWidth() - w) / 2;
+            g2d.setColor(new Color(0, 0, 0, 190));
+            g2d.fillRoundRect(x, 8, w, 28, 12, 12);
+            g2d.setColor(new Color(255, 220, 90));
+            g2d.drawString(currentNotice, x + 12, 27);
+            g2d.dispose();
+        }
+
+        if (menu != null) {
+            menu.paint(g, getWidth(), getHeight());
+        }
+    }
+
+    /** Small name label centred above a character. */
+    private void drawNameTag(Graphics g, String label, int x, int y) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING,
+                java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setFont(new Font("SansSerif", Font.BOLD, 10));
+        int w = g2.getFontMetrics().stringWidth(label);
+        int tx = x + (TILE_SIZE - w) / 2;
+        g2.setColor(new Color(0, 0, 0, 150));
+        g2.fillRoundRect(tx - 3, y - 12, w + 6, 12, 6, 6);
+        g2.setColor(Color.WHITE);
+        g2.drawString(label, tx, y - 3);
+        g2.dispose();
+    }
+
+    /**
+     * Tints every tile a live bomb will hit, stronger as its fuse runs out, so
+     * it is obvious where it is safe to stand. Follows the server's blast rule:
+     * hard walls stop it, a soft block is hit and stops it.
+     */
+    private void drawBlastPreview(Graphics g, List<int[]> bombsToPreview) {
+        TileType[][] m = map;
+        Graphics2D g2 = (Graphics2D) g.create();
+        int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (int[] bomb : bombsToPreview) {
+            if (bomb.length < 4) continue;
+            int bx = bomb[0], by = bomb[1], radius = bomb[2], remainingMs = bomb[3];
+            float urgency = 1f - Math.max(0, Math.min(remainingMs, FUSE_MS)) / (float) FUSE_MS;
+            g2.setColor(new Color(255, 40, 20, (int) (45 + urgency * 110)));
+            g2.fillRect(bx * TILE_SIZE, by * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            for (int[] d : dirs) {
+                for (int step = 1; step <= radius; step++) {
+                    int tx = bx + d[0] * step, ty = by + d[1] * step;
+                    if (ty < 0 || tx < 0 || ty >= m.length || tx >= m[0].length) break;
+                    if (m[ty][tx] == TileType.HARD_WALL) break;
+                    g2.fillRect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    if (m[ty][tx] == TileType.SOFT_BLOCK) break;
+                }
+            }
+        }
+        g2.dispose();
+    }
+
+    private void drawLobbyOverlay(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setColor(new Color(0, 0, 0, 180));
+        g2.fillRect(0, 0, getWidth(), getHeight());
+
+        int cx = getWidth() / 2;
+        int y = getHeight() / 2 - 90;
+        int panelW = 280, panelTop = y - 44;
+        int panelH = Math.max(y + 34 + lobbyPlayers.size() * 24 + 44, getHeight() / 2 + 70) + 26 - panelTop;
+        g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setColor(new Color(24, 26, 32, 235));
+        g2.fillRoundRect(cx - panelW / 2, panelTop, panelW, panelH, 18, 18);
+        g2.setColor(new Color(255, 205, 70));
+        g2.setStroke(new java.awt.BasicStroke(2f));
+        g2.drawRoundRect(cx - panelW / 2, panelTop, panelW, panelH, 18, 18);
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("SansSerif", Font.BOLD, 30));
+        centered(g2, "LOBBY", cx, y);
+
+        g2.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        List<String> names = lobbyPlayers;
+        centered(g2, "Players (" + names.size() + "/4)", cx, y += 34);
+        g2.setFont(new Font("SansSerif", Font.BOLD, 16));
+        for (String name : names) {
+            centered(g2, name, cx, y += 24);
+        }
+
+        g2.setFont(new Font("SansSerif", Font.BOLD, 18));
+        g2.setColor(new Color(255, 220, 90));
+        centered(g2, isLocalHost() ? "Press ENTER to start" : "Waiting for the host to start...",
+                cx, Math.max(y + 44, getHeight() / 2 + 70));
+        g2.dispose();
+    }
+
+    private static void centered(Graphics2D g2, String text, int cx, int y) {
+        g2.drawString(text, cx - g2.getFontMetrics().stringWidth(text) / 2, y);
     }
 
     /**

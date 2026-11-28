@@ -14,10 +14,11 @@ import java.util.Map;
 @Component
 public class GameFacade {
 
-    private final GameServer gameServer;
+    /** The proxy in front of GameServer (see GameServerProxy); the facade only knows the interface. */
+    private final GameService gameServer;
     private final Gson gson = new Gson();
 
-    public GameFacade(GameServer gameServer) {
+    public GameFacade(GameService gameServer) {
         this.gameServer = gameServer;
     }
 
@@ -37,6 +38,7 @@ public class GameFacade {
         Map<String, Object> status = new HashMap<>();
         status.put("game", "Bomberman Server");
         status.put("running", gameServer.isRunning());
+        status.put("phase", gameServer.getPhase().name());
         status.put("port", gameServer.getPort());
         status.put("wsEndpoint", "/ws/game");
         status.put("connectedPlayers", gameServer.getConnectedPlayerCount());

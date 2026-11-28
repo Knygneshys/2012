@@ -20,6 +20,15 @@ public final class GameConstants {
     public static final int BOMB_FUSE_MS = 2000;
     public static final int BOMB_RADIUS = 2;
 
+    // Rate limit enforced by GameServerProxy: a player's move messages closer
+    // together than this are dropped, so sending faster cannot move you faster.
+    public static final int MIN_MOVE_INTERVAL_MS = 25;
+
+    // How far (pixels) a player may be off a lane and still be slid into it
+    // when pressing towards it. Kept small so it only fixes near-misses: a
+    // bigger value slides you sideways a long way, which feels floaty.
+    public static final int CORNER_ASSIST_PX = 14;
+
 // NPCs. The game loop ticks every TICK_MS, so the move speed is in pixels per
 // tick: 1 keeps an NPC at a pace a player can still escape from.
 public static final int NPC_COUNT = 3;

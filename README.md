@@ -21,7 +21,8 @@ The client and server are completely decoupled: they do **not** share classes or
 - **NPCs**: Server-simulated wandering characters that eliminate players they run into and die in blasts
 - **Powerups**: Breakable walls sometimes drop a bonus (extra bomb, bigger blast, more speed) that players collect by walking over it
 - **Collision Detection**: Server-authoritative wall and obstacle collision checks
-- **Respawn**: Press R to reset the game
+- **Lobby & host**: Players wait in a lobby until the host starts; only the host can restart the round
+- **HUD**: Hotbar showing your available bombs, blast range and speed
 
 ## Requirements
 
@@ -83,16 +84,19 @@ cd client
 mvn exec:java -Dexec.args="localhost 8080"
 ```
 
-Enter your player name in the connection dialog and click **Connect**.
+Enter the server address and your player name on the title screen and press **Connect** (or Enter).
 
 ### 4. Controls
 
-- **W**: Move up
-- **S**: Move down
-- **A**: Move left
-- **D**: Move right
-- **SPACE**: Place bomb
-- **R**: Reset game
+- **W / A / S / D** or **arrow keys**: Move (hold to keep moving; you are slid round corners automatically)
+- **SPACE**: Place bomb (red tiles show where a bomb will blast)
+- **ENTER**: Start the game from the lobby (host only)
+- **R**: Restart the round (host only)
+- **ESC**: Menu: resume, map theme (Classic / Ice / Desert, remembered between launches), leave; plus start/restart/back to lobby for the host
+
+The first player to join is the **host** (marked with ★). Host-only actions are
+enforced on the server by `GameServerProxy` (Proxy pattern); see
+`docs/uml/proxy-pattern.puml`.
 
 ---
 

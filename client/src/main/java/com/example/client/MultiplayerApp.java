@@ -1,19 +1,28 @@
 package com.example.client;
 
 import com.example.client.network.NetworkClient;
-import com.example.client.network.ServerResponseMessage;
 
 import javax.swing.*;
 import java.awt.*;
 
 /**
  * Multiplayer Bomberman Client - connects to a server over the network.
+ * <p>
+ * Everything happens in one window: the {@link TitleScreen} first, then the
+ * game (HUD on top, map below). "Leave game" in the Esc menu comes back to the
+ * title screen.
  */
 public class MultiplayerApp {
     private static final GameLogger log = GameLogger.getInstance();
 
+    private static final String TITLE_CARD = "title";
+    private static final String GAME_CARD = "game";
+
     private static NetworkClient networkClient;
-    private static JFrame connectionFrame;
+    private static JFrame frame;
+    private static JPanel cards;
+    private static TitleScreen titleScreen;
+    private static JPanel gameView;
 
     public static void main(String[] args) {
         String host = "localhost";
@@ -33,125 +42,103 @@ public class MultiplayerApp {
 
         final String finalHost = host;
         final int finalPort = port;
-        SwingUtilities.invokeLater(() -> showConnectionDialog(finalHost, finalPort));
+        SwingUtilities.invokeLater(() -> createWindow(finalHost, finalPort));
     }
 
-    private static void showConnectionDialog(String defaultHost, int defaultPort) {
-        connectionFrame = new JFrame("Bomberman - Connect to Server");
-        connectionFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        connectionFrame.setResizable(false);
+    private static Dimension gameSize() {
+        return new Dimension(DemoMapFactory.MAP_WIDTH * MapPanel.TILE_SIZE,
+                DemoMapFactory.MAP_HEIGHT * MapPanel.TILE_SIZE + HudBar.HEIGHT);
+    }
 
-        JPanel panel = new JPanel(new GridLayout(4, 2, 10, 10));
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-
-        JLabel hostLabel = new JLabel("Server Host:");
-        JTextField hostField = new JTextField(defaultHost);
-
-        JLabel portLabel = new JLabel("Server Port:");
-        JSpinner portSpinner = new JSpinner(new SpinnerNumberModel(defaultPort, 1024, 65535, 1));
-
-        JLabel nameLabel = new JLabel("Player Name:");
-        JTextField nameField = new JTextField("Player");
-
-        JButton connectButton = new JButton("Connect");
-
-        panel.add(hostLabel);
-        panel.add(hostField);
-        panel.add(portLabel);
-        panel.add(portSpinner);
-        panel.add(nameLabel);
-        panel.add(nameField);
-        panel.add(new JLabel());
-        panel.add(connectButton);
-
-        connectButton.addActionListener(e -> {
-            String host = hostField.getText().trim();
-            int port = (Integer) portSpinner.getValue();
-            String playerName = nameField.getText().trim();
-
-            if (playerName.isEmpty()) {
-                JOptionPane.showMessageDialog(connectionFrame, "Player name cannot be empty!");
-                return;
+    private static void createWindow(String defaultHost, int defaultPort) {
+        frame = new JFrame("Bomberman - Multiplayer");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setResizable(false);
+        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                if (networkClient != null) {
+                    networkClient.disconnect();
+                }
             }
-
-            connectButton.setEnabled(false);
-            connectButton.setText("Connecting...");
-
-            new Thread(() -> {
-                try {
-                    networkClient = new NetworkClient(host, port);
-                    if (networkClient.connect()) {
-                        log.info("Connected to server!");
-
-                        // Set up response handler
-                        networkClient.setOnServerResponse(msg -> {
-                            if (msg.success) {
-                                connectionFrame.dispose();
-                                launchGame(playerName);
-                            } else {
-                                JOptionPane.showMessageDialog(connectionFrame,
-                                        "Failed to join: " + msg.message, "Connection Error",
-                                        JOptionPane.ERROR_MESSAGE);
-                                connectButton.setEnabled(true);
-                                connectButton.setText("Connect");
-                                networkClient.disconnect();
-                            }
-                        });
-
-                        networkClient.joinGame(playerName);
-                    } else {
-                        JOptionPane.showMessageDialog(connectionFrame,
-                                "Failed to connect to server at " + host + ":" + port,
-                                "Connection Error", JOptionPane.ERROR_MESSAGE);
-                        connectButton.setEnabled(true);
-                        connectButton.setText("Connect");
-                    }
-                } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(connectionFrame,
-                            "Error: " + ex.getMessage(), "Connection Error",
-                            JOptionPane.ERROR_MESSAGE);
-                    connectButton.setEnabled(true);
-                    connectButton.setText("Connect");
-                }
-            }).start();
         });
 
-        connectionFrame.add(panel);
-        connectionFrame.pack();
-        connectionFrame.setLocationRelativeTo(null);
-        connectionFrame.setVisible(true);
+        cards = new JPanel(new CardLayout());
+        titleScreen = new TitleScreen(defaultHost, defaultPort, gameSize(), MultiplayerApp::connect);
+        cards.add(titleScreen, TITLE_CARD);
+
+        frame.add(cards);
+        frame.pack();
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+        titleScreen.start();
     }
 
-    private static void launchGame(String playerName) {
-        SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("Bomberman - Multiplayer");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.addWindowListener(new java.awt.event.WindowAdapter() {
-                @Override
-                public void windowClosing(java.awt.event.WindowEvent e) {
-                    if (networkClient != null) {
-                        networkClient.disconnect();
-                    }
+    private static void connect(String host, int port, String playerName) {
+        new Thread(() -> {
+            try {
+                NetworkClient client = new NetworkClient(host, port);
+                if (!client.connect()) {
+                    SwingUtilities.invokeLater(() ->
+                            titleScreen.showError("Could not reach a server at " + host + ":" + port));
+                    return;
                 }
-            });
+                log.info("Connected to server!");
+                networkClient = client;
 
-            TileType[][] map = DemoMapFactory.createDefaultMap();
-            Player player = new Player(1 * MapPanel.TILE_SIZE, 1 * MapPanel.TILE_SIZE,
-                    10, playerName, Color.BLUE, MapPanel.TILE_SIZE, MapPanel.TILE_SIZE);
+                // The join reply decides whether we enter the game
+                java.util.concurrent.atomic.AtomicBoolean answered = new java.util.concurrent.atomic.AtomicBoolean();
+                client.setOnServerResponse(msg -> SwingUtilities.invokeLater(() -> {
+                    if (answered.getAndSet(true)) return; // only the first reply matters
+                    if (msg.success) {
+                        showGame(playerName);
+                    } else {
+                        titleScreen.showError("Could not join: " + msg.message);
+                        client.disconnect();
+                    }
+                }));
+                client.joinGame(playerName);
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> titleScreen.showError("Error: " + ex.getMessage()));
+            }
+        }, "connect").start();
+    }
 
-            MapPanel mapPanel = new MapPanel(map, player);
-            GameController controller = new GameController(player, mapPanel, map, networkClient);
+    private static void showGame(String playerName) {
+        TileType[][] map = DemoMapFactory.createDefaultMap();
+        Player player = new Player(1 * MapPanel.TILE_SIZE, 1 * MapPanel.TILE_SIZE,
+                10, playerName, Color.BLUE, MapPanel.TILE_SIZE, MapPanel.TILE_SIZE);
 
-            frame.add(mapPanel);
-            frame.pack();
-            frame.setLocationRelativeTo(null);
-            frame.setResizable(false);
-            frame.setVisible(true);
-            mapPanel.setFocusable(true);
-            mapPanel.requestFocusInWindow();
+        MapPanel mapPanel = new MapPanel(map, player);
+        GameController controller = new GameController(player, mapPanel, map, networkClient);
+        controller.setOnLeave(MultiplayerApp::showTitle);
 
-            log.info("Game started! Use WASD to move, SPACE to place bomb, R to reset.");
-            log.info("You are: " + playerName);
-        });
+        if (gameView != null) {
+            cards.remove(gameView);
+        }
+        gameView = new JPanel(new BorderLayout());
+        gameView.add(controller.getHudBar(), BorderLayout.NORTH);
+        gameView.add(mapPanel, BorderLayout.CENTER);
+        cards.add(gameView, GAME_CARD);
+
+        titleScreen.stop();
+        ((CardLayout) cards.getLayout()).show(cards, GAME_CARD);
+        frame.pack();
+        mapPanel.setFocusable(true);
+        mapPanel.requestFocusInWindow();
+
+        log.info("Game started! WASD/arrows to move, SPACE bomb, ENTER start (host), R restart (host), ESC menu.");
+        log.info("You are: " + playerName);
+    }
+
+    private static void showTitle() {
+        networkClient = null;
+        ((CardLayout) cards.getLayout()).show(cards, TITLE_CARD);
+        if (gameView != null) {
+            cards.remove(gameView);
+            gameView = null;
+        }
+        frame.pack();
+        titleScreen.start();
     }
 }

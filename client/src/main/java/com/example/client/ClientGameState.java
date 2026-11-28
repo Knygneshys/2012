@@ -16,11 +16,12 @@ import java.util.List;
  * subject is handing the same object to several listeners.
  *
  * @param map            the authoritative tile layout
- * @param serverBombs    bombs the server has placed, as tile coordinates
+ * @param serverBombs    bombs the server has placed, as {tileX, tileY, radius, remainingMs}
  * @param explosionTiles one tile list per live explosion
  * @param players        every player the server knows about, local one included
  * @param npcs           the NPCs the server currently simulates
  * @param powerups       the powerups currently lying on the map
+ * @param lobby          true while players wait in the lobby for the host to start
  */
 public record ClientGameState(
         TileType[][] map,
@@ -28,7 +29,8 @@ public record ClientGameState(
         List<int[][]> explosionTiles,
         List<PlayerSnapshot> players,
         List<NPC> npcs,
-        List<Powerup> powerups) {
+        List<Powerup> powerups,
+        boolean lobby) {
 
     /**
      * One player as the client needs them. The colour arrives parsed, so no
@@ -37,7 +39,11 @@ public record ClientGameState(
      * @param moveSpeed the speed the server last simulated for this player,
      *                  which already reflects any powerup bonus. The client
      *                  never decides it.
+     * @param maxBombs    bombs this player may have out at once
+     * @param activeBombs bombs this player currently has on the map
+     * @param bombRadius  how far this player's blasts reach
      */
     public record PlayerSnapshot(
-            int id, String name, int x, int y, boolean alive, Color color, int moveSpeed) {}
+            int id, String name, int x, int y, boolean alive, Color color, int moveSpeed,
+            int maxBombs, int activeBombs, int bombRadius) {}
 }

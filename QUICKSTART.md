@@ -61,12 +61,14 @@ Or launch each process manually:
 
 | Key | Action |
 |-----|--------|
-| **W** | Move Up |
-| **S** | Move Down |
-| **A** | Move Left |
-| **D** | Move Right |
+| **W / ↑** | Move Up |
+| **S / ↓** | Move Down |
+| **A / ←** | Move Left |
+| **D / →** | Move Right |
 | **SPACE** | Place Bomb |
-| **R** | Reset Game |
+| **ENTER** | Start game from lobby (host only) |
+| **R** | Restart round (host only) |
+| **ESC** | Game menu |
 
 ## Game Rules
 

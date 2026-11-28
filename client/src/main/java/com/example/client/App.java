@@ -16,7 +16,8 @@ public class App {
             MapPanel mapPanel = new MapPanel(map, player);
             NetworkClient networkClient = new NetworkClient("localhost", 8080);
             GameController controller = new GameController(player, mapPanel, map, networkClient);
-            frame.add(mapPanel);
+            frame.add(mapPanel, java.awt.BorderLayout.CENTER);
+            frame.add(controller.getHudBar(), java.awt.BorderLayout.NORTH);
             frame.pack();
             frame.setLocationRelativeTo(null);
             frame.setResizable(false);

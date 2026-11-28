@@ -28,6 +28,9 @@ public class NetworkClient {
     private int playerId = -1;
     private Consumer<GameStateMessage> onGameStateUpdate;
     private Consumer<ServerResponseMessage> onServerResponse;
+    private Consumer<AccessControlMessage> onAccessControl;
+    /** Kept here because the first host update can arrive before the game window exists. */
+    private volatile int hostPlayerId = -1;
     private volatile boolean connected = false;
 
     public NetworkClient(String host, int port) {
@@ -132,6 +135,12 @@ public class NetworkClient {
                 if (onGameStateUpdate != null) {
                     onGameStateUpdate.accept(msg);
                 }
+            } else if (json.contains("\"messageType\":\"ACCESS_CONTROL\"")) {
+                AccessControlMessage msg = gson.fromJson(json, AccessControlMessage.class);
+                hostPlayerId = msg.hostPlayerId;
+                if (onAccessControl != null) {
+                    onAccessControl.accept(msg);
+                }
             } else if (json.contains("\"messageType\":\"SERVER_RESPONSE\"")) {
                 ServerResponseMessage msg = gson.fromJson(json, ServerResponseMessage.class);
                 if (msg.success && playerId == -1) {
@@ -155,6 +164,18 @@ public class NetworkClient {
 
     public void setOnServerResponse(Consumer<ServerResponseMessage> callback) {
         this.onServerResponse = callback;
+    }
+
+    public void setOnAccessControl(Consumer<AccessControlMessage> callback) {
+        this.onAccessControl = callback;
+    }
+
+    public int getHostPlayerId() {
+        return hostPlayerId;
+    }
+
+    public boolean isHost() {
+        return playerId != -1 && playerId == hostPlayerId;
     }
 
     public boolean isConnected() {

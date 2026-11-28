@@ -22,9 +22,12 @@ public class SerializationVisitor implements GameObjectVisitor {
 
     @Override
     public void visit(ServerPlayer player) {
-        data.players.add(new GameStateData.PlayerData(
+        GameStateData.PlayerData pd = new GameStateData.PlayerData(
                 player.id, player.name, player.x, player.y,
-                player.alive, player.colorHex, player.moveSpeed));
+                player.alive, player.colorHex, player.moveSpeed);
+        pd.maxBombs = player.maxBombs;
+        pd.bombRadius = player.bombRadius;
+        data.players.add(pd);
     }
 
     @Override

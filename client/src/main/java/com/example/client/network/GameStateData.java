@@ -13,6 +13,8 @@ public class GameStateData {
     public List<ExplosionData> explosions = new ArrayList<>();
     public List<NpcData> npcs = new ArrayList<>();
     public List<PowerupData> powerups = new ArrayList<>();
+    /** "LOBBY" or "PLAYING". */
+    public String phase;
 
     public GameStateData() {
     }
@@ -25,6 +27,10 @@ public class GameStateData {
         public boolean alive;
         public String colorHex; // hex color representation e.g. #0000ff
         public int moveSpeed;
+        // HUD stats
+        public int maxBombs;
+        public int activeBombs;
+        public int bombRadius;
 
         public PlayerData() {
         }

@@ -76,7 +76,8 @@ public class GameStateSubject {
                 translateExplosions(data.explosions),
                 translatePlayers(data.players),
                 translateNpcs(data.npcs),
-                translatePowerups(data.powerups));
+                translatePowerups(data.powerups),
+                "LOBBY".equals(data.phase));
     }
 
     private TileType[][] translateMap(int[][] raw) {
@@ -94,7 +95,7 @@ public class GameStateSubject {
     private List<int[]> translateBombs(List<GameStateData.BombData> bombs) {
         List<int[]> tiles = new ArrayList<>(bombs.size());
         for (GameStateData.BombData bomb : bombs) {
-            tiles.add(new int[]{bomb.tileX, bomb.tileY});
+            tiles.add(new int[]{bomb.tileX, bomb.tileY, bomb.radius, bomb.remainingMs});
         }
         return tiles;
     }
@@ -112,7 +113,8 @@ public class GameStateSubject {
         for (GameStateData.PlayerData player : players) {
             snapshots.add(new ClientGameState.PlayerSnapshot(
                     player.playerId, player.name, player.x, player.y,
-                    player.alive, hexToColor(player.colorHex), player.moveSpeed));
+                    player.alive, hexToColor(player.colorHex), player.moveSpeed,
+                    player.maxBombs, player.activeBombs, player.bombRadius));
         }
         return snapshots;
     }

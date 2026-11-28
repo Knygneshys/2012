@@ -43,9 +43,12 @@ import java.util.concurrent.*;
 /**
  * Multiplayer Bomberman Game Server (Spring Component).
  * Manages game state, physics, and WebSocket client connections.
+ * <p>
+ * Proxy pattern — Real Subject: player requests reach this class only through
+ * {@link com.example.server.proxy.GameServerProxy}, which enforces who may do what.
  */
 @Component
-public class GameServer implements CommandLineRunner {
+public class GameServer implements CommandLineRunner, GameService {
 
     private static final GameLogger log = GameLogger.getInstance();
 
@@ -67,6 +70,8 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
 
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private volatile boolean running = true;
+    /** Starts in the lobby; the host's START moves it to PLAYING (see GameServerProxy). */
+    private volatile GamePhase phase = GamePhase.LOBBY;
     private final Gson gson = new Gson();
     private final Random random = new Random();
 
@@ -107,7 +112,10 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
                 long deltaMs = now - lastUpdateTime;
 
                 if (deltaMs >= GameConstants.TICK_MS) {
-                    updateGameState((int) deltaMs);
+                    // The lobby is frozen: players see the map but nothing moves or burns.
+                    if (phase == GamePhase.PLAYING) {
+                        updateGameState((int) deltaMs);
+                    }
                     broadcastGameState();
                     lastUpdateTime = now;
                 }
@@ -309,7 +317,8 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
                         synchronized (session) {
                             session.sendMessage(textMessage);
                         }
-                    } catch (IOException e) {
+                    } catch (IOException | IllegalStateException e) {
+                        // IllegalStateException: closed between isOpen() and the send
                         log.error("Error sending state to session " + session.getId(), e);
                     }
                 }
@@ -341,6 +350,13 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             npc.accept(visitor);
         }
 
+        // HUD: how many bombs each player currently has on the map
+        for (GameStateData.PlayerData pd : data.players) {
+            ServerPlayer p = players.get(pd.playerId);
+            if (p != null) pd.activeBombs = countBombsOf(p);
+        }
+        data.phase = phase.name();
+
         // Convert explosions
         for (ServerExplosion ex : explosions) {
             int[][] tiles = new int[ex.tiles.size()][2];
@@ -362,6 +378,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         return data;
     }
 
+    @Override
     public synchronized void handlePlayerJoin(WebSocketSession session, PlayerJoinMessage msg) {
         int playerId = allocatePlayerId();
 
@@ -395,6 +412,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         sendMessage(session, gson.toJson(response));
     }
 
+    @Override
     public void handlePlayerInput(WebSocketSession session, PlayerInputMessage msg) {
         Integer playerId = sessionIdToPlayerId.get(session.getId());
         if (playerId == null || !players.containsKey(playerId)) {
@@ -402,22 +420,32 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         }
 
         ServerPlayer player = players.get(playerId);
+        if (phase == GamePhase.LOBBY) {
+            // Nothing happens in the lobby until the host starts the game
+            if ("START".equals(msg.action)) startGame();
+            return;
+        }
         switch (msg.action) {
-            case "UP" -> player.move(0, -player.moveSpeed, map);
-            case "DOWN" -> player.move(0, player.moveSpeed, map);
-            case "LEFT" -> player.move(-player.moveSpeed, 0, map);
-            case "RIGHT" -> player.move(player.moveSpeed, 0, map);
+            case "UP" -> player.moveAssisted(0, -player.moveSpeed, map);
+            case "DOWN" -> player.moveAssisted(0, player.moveSpeed, map);
+            case "LEFT" -> player.moveAssisted(-player.moveSpeed, 0, map);
+            case "RIGHT" -> player.moveAssisted(player.moveSpeed, 0, map);
             case "BOMB" -> placeBomb(player);
             case "RESET" -> resetGame();
+            case "LOBBY" -> returnToLobby();
         }
     }
 
+    @Override
     public synchronized void handleSessionClosed(WebSocketSession session) {
         Integer playerId = sessionIdToPlayerId.remove(session.getId());
         if (playerId != null) {
             players.remove(playerId);
             clientSessions.remove(playerId);
             log.info("Player #" + playerId + " disconnected. Connected: " + clientSessions.size());
+            if (players.isEmpty() && phase != GamePhase.LOBBY) {
+                returnToLobby();
+            }
         }
     }
 
@@ -463,6 +491,7 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         return count;
     }
 
+    @Override
     public synchronized void resetGame() {
         map = ServerMapFactory.createDefaultMap();
         bombs.clear();
@@ -477,6 +506,46 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
             p.setMediator(gameMediator);
         }
         log.info("Game reset!");
+    }
+
+    @Override
+    public Integer getPlayerIdForSession(String sessionId) {
+        return sessionIdToPlayerId.get(sessionId);
+    }
+
+    @Override
+    public List<Integer> getPlayerIds() {
+        synchronized (players) {
+            return new ArrayList<>(players.keySet());
+        }
+    }
+
+    @Override
+    public boolean isPlayerAlive(int playerId) {
+        ServerPlayer p = players.get(playerId);
+        return p != null && p.alive;
+    }
+
+    /** Starts a fresh round from the lobby. Does nothing if a round is already running. */
+    @Override
+    public synchronized void startGame() {
+        if (phase == GamePhase.PLAYING) return;
+        resetGame();
+        phase = GamePhase.PLAYING;
+        log.info("Game started with " + players.size() + " player(s)!");
+    }
+
+    /** Ends the round and sends everyone back to the lobby with a fresh map. */
+    @Override
+    public synchronized void returnToLobby() {
+        resetGame();
+        phase = GamePhase.LOBBY;
+        log.info("Back to the lobby");
+    }
+
+    @Override
+    public GamePhase getPhase() {
+        return phase;
     }
 
     public int getActiveBombCount() {
@@ -514,22 +583,27 @@ private final Map<String, Integer> sessionIdToPlayerId = Collections.synchronize
         return -1; // Game full
     }
 
+    @Override
     public boolean isRunning() {
         return running;
     }
 
+    @Override
     public int getPort() {
         return port;
     }
 
+    @Override
     public int getConnectedPlayerCount() {
         return clientSessions.size();
     }
 
+    @Override
     public int getMaxPlayers() {
         return GameConstants.MAX_PLAYERS;
     }
 
+    @Override
     public List<Map<String, Object>> getPlayerSummaryList() {
         List<Map<String, Object>> list = new ArrayList<>();
         for (ServerPlayer p : players.values()) {

@@ -48,27 +48,33 @@ public abstract class ServerCharacter extends ServerGameObject {
         if (dx == 0 && dy == 0) return false;
         if (map == null || map.length == 0 || map[0].length == 0) return false;
 
-        int size = GameConstants.TILE_SIZE;
         int newX = x + dx;
         int newY = y + dy;
-
-        if (newX < 0 || newY < 0
-            || newX + size > map[0].length * size
-            || newY + size > map.length * size) {
-            return false;
-        }
-
-        // Collision check with the four corners of the body.
-        if (!isPassableAt(map, newX, newY)
-            || !isPassableAt(map, newX + size - 1, newY)
-            || !isPassableAt(map, newX, newY + size - 1)
-            || !isPassableAt(map, newX + size - 1, newY + size - 1)) {
+        if (!canOccupy(newX, newY, map)) {
             return false;
         }
 
         x = newX;
         y = newY;
         return true;
+    }
+
+    /**
+     * True when a body at (px, py) would be fully inside the map with every
+     * tile it covers passable.
+     */
+    protected static boolean canOccupy(int px, int py, ServerBlock[][] map) {
+        int size = GameConstants.TILE_SIZE;
+        if (px < 0 || py < 0
+            || px + size > map[0].length * size
+            || py + size > map.length * size) {
+            return false;
+        }
+        // Collision check with the four corners of the body.
+        return isPassableAt(map, px, py)
+            && isPassableAt(map, px + size - 1, py)
+            && isPassableAt(map, px, py + size - 1)
+            && isPassableAt(map, px + size - 1, py + size - 1);
     }
 
     /**
